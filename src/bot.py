@@ -1,7 +1,10 @@
 # bot.py
+import sqlite3
 
 import discord
 from discord.ext import commands
+
+import database as db
 
 bot = commands.Bot(command_prefix='!')
 
@@ -9,7 +12,7 @@ bot = commands.Bot(command_prefix='!')
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
 
-@bot.command(name='g')
+@bot.command(name='game-create')
 @commands.has_role('Admin')
 async def game_init(ctx, game_name='wolf'):
     guild = ctx.guild
@@ -28,7 +31,7 @@ async def game_init(ctx, game_name='wolf'):
     await guild.create_text_channel('lynching', category=game_channel)
     await guild.create_text_channel('werewolves', category=game_channel)
     await guild.create_text_channel('vampires', category=game_channel)
-    await guild.create_text_channel('deceased', category=game_channel)
+    await guild.create_text_channel('graveyard', category=game_channel)
 
     #todo create roles
     print('creating roles')
@@ -37,7 +40,7 @@ async def game_init(ctx, game_name='wolf'):
     await guild.create_role(name=f'{game_name}-mod')
 
 
-@bot.command(name='d')
+@bot.command(name='game-remove')
 @commands.has_role('Admin')
 async def game_del(ctx, game_name='wolf'):
     guild = ctx.guild
@@ -56,6 +59,15 @@ async def game_del(ctx, game_name='wolf'):
         if game_name in role.name:
             await role.delete()
 
+@bot.event
+async def on_raw_reaction_add(payload):
+    print(f'{payload.message_id}')
+    print(payload)
+    guild = bot.get_guild(payload.guild_id)
+    if payload.message_id == 677090496987922432 and payload.emoji.name == '👍':
+        member = guild.get_member(payload.user_id)
+        role = discord.utils.get(guild.roles, name="day-alive")
+        await member.add_roles(role)
 
 
 @bot.event
