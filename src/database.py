@@ -1,7 +1,11 @@
+from __future__ import print_function
 import logging
 import os
 import sqlite3
 
+from dotenv import load_dotenv
+from gsheets import Sheets
+import os.path
 import pandas as pd
 
 import globals
@@ -27,30 +31,36 @@ def create_database_tables():
                                )''')
             # create table CHANNEL
             cursor.execute('''CREATE TABLE IF NOT EXISTS channel(
-                                    channel_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                    channel_id INTEGER PRIMARY KEY
                                     ,channel_name TEXT
+                                    ,channel_order INTEGER
+                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                )''')
             # create table CHARACTER
             cursor.execute('''CREATE TABLE IF NOT EXISTS character(
-                                    character_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                    character_id INTEGER PRIMARY KEY
                                     ,character_name TEXT
+                                    ,weighting INTEGER
+                                    ,max_duplicates INTEGER
+                                    ,difficulty INTEGER
+                                    ,starting_affiliation TEXT
+                                    ,seen_affiliation TEXT
                                     ,char_short_description TEXT
                                     ,char_card_description TEXT
                                     ,char_full_description TEXT
-                                    ,weighting INTEGER
-                                    ,max_duplicates INTEGER
-                                    ,starting_affiliation TEXT
-                                    ,seen_affiliation TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                 )''')
             # create table EVENT
             cursor.execute('''CREATE TABLE IF NOT EXISTS event(
-                                    event_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                    event_id INTEGER PRIMARY KEY
                                     ,event_name TEXT
                                     ,event_description TEXT
+                                    ,character_acting_id INTEGER
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,FOREIGN KEY(character_acting_id) REFERENCES character(character_id)
                                 )''')
             # create table GAME_PLAYER
             cursor.execute('''CREATE TABLE IF NOT EXISTS game_player(
@@ -146,23 +156,29 @@ def create_database_tables():
             db.rollback()
             raise e
 
+
 def insert_into_table(table, data):
     columns = ''
     values  = []
-
-    if type(data) == dict: # todo extent do dataframes and lists
-        for key, value in data.items():
-            if value is None:
-                continue
-            columns += f'{key}, '
-            values.append(value)
-        values = tuple(values)
-
+    num_values = 0
 
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
+        if type(data) == pd.DataFrame:
+            data.to_sql(table, db, if_exists='append', index=False)
+            return None
+        elif type(data) == dict: # todo extent do dataframes and lists
+            for key, value in data.items():
+                if value is None:
+                    continue
+                columns += f'{key}, '
+                values.append(value)
+            values = tuple(values)
+            num_values = len(values)
+
+
         try:
             cursor = db.cursor()
-            qmarks = '?,' * len(values)
+            qmarks = '?,' * num_values
             query = f"INSERT INTO {table} ({columns[:-2]}) VALUES ({qmarks[:-1]});"
 
             cursor.execute(query, values)
@@ -171,10 +187,8 @@ def insert_into_table(table, data):
             raise e
 
 
-
 def game_insert(discord_category_id, game_name, start_date=None, end_date=None, number_of_players=None, status=None, game_length=None):
     insert_into_table('game', locals())
-
 
 
 def get_table(table):
@@ -187,13 +201,25 @@ def get_table_schema(table):
         return pd.read_sql_query(f"pragma table_info('{table}')", db)
 
 
+def insert_default_data():
+    sheets = Sheets.from_files(globals.BASE_DIR / 'credentials.json', globals.BASE_DIR / 'storage.json')
+    workbook = sheets[os.getenv('GOOGLE_SHEET_DEFAULT_DATA_FILE_ID')]
+    tables = ['character', 'event', 'channel', 'character_permission']
+    for table in tables:
+        insert_into_table(table, workbook.find(table).to_frame())
+
+
 if __name__ == '__main__':
     globals.setup_logging(globals.BASE_DIR / 'logging_config.yaml', logging.DEBUG)
+    load_dotenv()
     try:
         os.remove(globals.DB_FILE_LOCATION)
     except FileNotFoundError:
         pass
     create_database_tables()
+
+    insert_default_data()
+    print(get_table('channel'))
 
     # game_insert(1, 'FIRE', number_of_players=1, game_length=1)
     #

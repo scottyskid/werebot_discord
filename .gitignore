@@ -4,6 +4,9 @@
 
 #environement variables
 .env
+credentials.json
+token.pickle
+storage.json
 
 # virtural environment
 venv/
