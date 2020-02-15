@@ -20,6 +20,7 @@ def create_database_tables():
             cursor.execute('''CREATE TABLE IF NOT EXISTS game(
                                     game_id INTEGER PRIMARY KEY AUTOINCREMENT
                                     ,discord_category_id INTEGER NOT NULL
+                                    ,discord_announce_message_id INTEGER NOT NULL
                                     ,game_name TEXT
                                     ,start_date DATE
                                     ,end_date DATE
@@ -33,6 +34,7 @@ def create_database_tables():
             cursor.execute('''CREATE TABLE IF NOT EXISTS channel(
                                     channel_id INTEGER PRIMARY KEY
                                     ,channel_name TEXT
+                                    ,channel_topic TEXT
                                     ,channel_order INTEGER
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
@@ -66,8 +68,8 @@ def create_database_tables():
             cursor.execute('''CREATE TABLE IF NOT EXISTS game_player(
                                     game_player_id INTEGER PRIMARY KEY AUTOINCREMENT
                                     ,game_id INTEGER NOT NULL
-                                    ,character_id INTEGER NOT NULL
-                                    ,starting_character_id INTEGER NOT NULL
+                                    ,character_id INTEGER
+                                    ,starting_character_id INTEGER
                                     ,discord_user_id INTEGER NOT NULL
                                     ,current_affiliation TEXT
                                     ,position INTEGER
@@ -201,6 +203,28 @@ def get_table_schema(table):
         return pd.read_sql_query(f"pragma table_info('{table}')", db)
 
 
+def delete_from_table(table, indicators):
+    query = f"DELETE FROM {table} WHERE "
+    cnt = 0
+    for key, value in indicators.items():
+        if cnt > 0:
+            query += 'AND '
+        query += f"{key} = '{value}'"
+        cnt += 1
+    query += ';'
+
+    print(query)
+
+    with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
+        try:
+            cursor = db.cursor()
+
+            cursor.execute(query)
+        except Exception as e:
+            db.rollback()
+            raise e
+
+
 def insert_default_data():
     sheets = Sheets.from_files(globals.BASE_DIR / 'credentials.json', globals.BASE_DIR / 'storage.json')
     workbook = sheets[os.getenv('GOOGLE_SHEET_DEFAULT_DATA_FILE_ID')]
@@ -219,7 +243,8 @@ if __name__ == '__main__':
     create_database_tables()
 
     insert_default_data()
-    print(get_table('channel'))
+
+    # print(get_table('channel'))
 
     # game_insert(1, 'FIRE', number_of_players=1, game_length=1)
     #
