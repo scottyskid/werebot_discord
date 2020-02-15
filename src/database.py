@@ -64,6 +64,30 @@ def create_database_tables():
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                     ,FOREIGN KEY(character_acting_id) REFERENCES character(character_id)
                                 )''')
+            # create table ROLE
+            cursor.execute('''CREATE TABLE IF NOT EXISTS role(
+                                    role_id INTEGER PRIMARY KEY
+                                    ,role_name TEXT
+                                    ,role_description TEXT
+                                    ,default_player BOOLEAN
+                                    ,default_narrator BOOLEAN
+                                    ,default_everyone BOOLEAN
+                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                )''')
+            # create table ROLE_PERMISSION
+            cursor.execute('''CREATE TABLE IF NOT EXISTS role_permission (
+                                   role_permission_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                   ,channel_id INTEGER
+                                   ,permission_name INTEGER
+                                   ,permission_value INTEGER
+                                   ,role_id TEXT
+                                   ,day_night TEXT
+                                   ,created_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
+                                   ,FOREIGN KEY(role_id) REFERENCES role(role_id)
+                               )''')
             # create table GAME_PLAYER
             cursor.execute('''CREATE TABLE IF NOT EXISTS game_player(
                                     game_player_id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -123,6 +147,7 @@ def create_database_tables():
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
                                 )''')
+
             # create table GAME_PERMISSION
             cursor.execute('''CREATE TABLE IF NOT EXISTS character_permission(
                                     character_permission_id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -193,6 +218,12 @@ def game_insert(discord_category_id, game_name, start_date=None, end_date=None, 
     insert_into_table('game', locals())
 
 
+def get_table_role_permission():
+    with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
+        return pd.read_sql_query(f'''select * from role_permission
+                                 left outer join role
+                                 using (role_id)''', db)
+
 def get_table(table):
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
         return pd.read_sql_query(f'select * from {table}', db)
@@ -208,12 +239,10 @@ def delete_from_table(table, indicators):
     cnt = 0
     for key, value in indicators.items():
         if cnt > 0:
-            query += 'AND '
-        query += f"{key} = '{value}'"
+            query += ' AND '
+        query += f"{key}='{value}'"
         cnt += 1
     query += ';'
-
-    print(query)
 
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
         try:
@@ -228,7 +257,7 @@ def delete_from_table(table, indicators):
 def insert_default_data():
     sheets = Sheets.from_files(globals.BASE_DIR / 'credentials.json', globals.BASE_DIR / 'storage.json')
     workbook = sheets[os.getenv('GOOGLE_SHEET_DEFAULT_DATA_FILE_ID')]
-    tables = ['character', 'event', 'channel', 'character_permission']
+    tables = ['character', 'event', 'channel', 'character_permission', 'role_permission', 'role']
     for table in tables:
         insert_into_table(table, workbook.find(table).to_frame())
 
@@ -244,6 +273,7 @@ if __name__ == '__main__':
 
     insert_default_data()
 
+    # print(get_table_role_permission().dtypes)
     # print(get_table('channel'))
 
     # game_insert(1, 'FIRE', number_of_players=1, game_length=1)
