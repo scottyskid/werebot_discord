@@ -8,6 +8,8 @@ import yaml
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+DB_FILE_LOCATION = BASE_DIR / 'data' / 'uw.db'
+
 
 def setup_logging(default_path, default_level=logging.WARNING):
     """Setup logging configuration
