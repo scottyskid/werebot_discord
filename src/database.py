@@ -34,14 +34,16 @@ def create_database_tables():
             cursor.execute('''CREATE TABLE IF NOT EXISTS channel(
                                     channel_id INTEGER PRIMARY KEY
                                     ,channel_name TEXT
-                                    ,channel_topic TEXT
                                     ,channel_order INTEGER
+                                    ,channel_topic TEXT
+                                    ,channel_type TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                )''')
             # create table CHARACTER
             cursor.execute('''CREATE TABLE IF NOT EXISTS character(
                                     character_id INTEGER PRIMARY KEY
+                                    ,character_display_name TEXT
                                     ,character_name TEXT
                                     ,weighting INTEGER
                                     ,max_duplicates INTEGER
@@ -118,6 +120,18 @@ def create_database_tables():
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                     ,FOREIGN KEY(game_player_id) REFERENCES game_player(game_player_id)
                                 )''')
+            # create table GAME_CHARACTER
+            cursor.execute('''CREATE TABLE IF NOT EXISTS game_character (
+                                   game_character_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                   ,game_id INTEGER NOT NULL
+                                   ,character_id INTEGER NOT NULL
+                                   ,build_name TEXT
+                                   ,will_play BOOLEAN DEFAULT True
+                                   ,created_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,FOREIGN KEY(game_id) REFERENCES game(game_id)
+                                   ,FOREIGN KEY(character_id) REFERENCES character(character_id)
+                               )''')
             # create table GAME_EVENT
             cursor.execute('''CREATE TABLE IF NOT EXISTS game_event(
                                     game_event_id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -147,7 +161,18 @@ def create_database_tables():
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
                                 )''')
-
+            # create table GAME_ROLE
+            cursor.execute('''CREATE TABLE IF NOT EXISTS game_role(
+                                    game_role_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                    ,game_id INTEGER NOT NULL
+                                    ,role_id INTEGER NOT NULL
+                                    ,discord_role_id INTEGER NOT NULL
+                                    ,game_role_name TEXT
+                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,FOREIGN KEY(game_id) REFERENCES game(game_id)
+                                    ,FOREIGN KEY(role_id) REFERENCES role(role_id)
+                                )''')
             # create table GAME_PERMISSION
             cursor.execute('''CREATE TABLE IF NOT EXISTS character_permission(
                                     character_permission_id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -198,10 +223,9 @@ def insert_into_table(table, data):
                 if value is None:
                     continue
                 columns += f'{key}, '
-                values.append(value)
+                values.append(str(value)) # todo sort out how this works with boolean values
             values = tuple(values)
             num_values = len(values)
-
 
         try:
             cursor = db.cursor()
@@ -218,15 +242,22 @@ def game_insert(discord_category_id, game_name, start_date=None, end_date=None, 
     insert_into_table('game', locals())
 
 
-def get_table_role_permission():
+def get_table(table, indicators=None, joins=None):
+    query = f'SELECT * from {table}'
+    if joins is not None:
+        for key, value in joins.items():
+            query += f'\nLEFT OUTER JOIN {key} USING ({value})'
+    if indicators is not None:
+        query += "\nWHERE "
+        cnt = 0
+        for key, value in indicators.items():
+            if cnt > 0:
+                query += '\nAND '
+            query += f"cast({key} as text)='{value}'"
+            cnt += 1
+    query += ';'
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
-        return pd.read_sql_query(f'''select * from role_permission
-                                 left outer join role
-                                 using (role_id)''', db)
-
-def get_table(table):
-    with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
-        return pd.read_sql_query(f'select * from {table}', db)
+        return pd.read_sql_query(query, db)
 
 
 def get_table_schema(table):
@@ -234,14 +265,16 @@ def get_table_schema(table):
         return pd.read_sql_query(f"pragma table_info('{table}')", db)
 
 
-def delete_from_table(table, indicators):
-    query = f"DELETE FROM {table} WHERE "
-    cnt = 0
-    for key, value in indicators.items():
-        if cnt > 0:
-            query += ' AND '
-        query += f"{key}='{value}'"
-        cnt += 1
+def delete_from_table(table, indicators=None):
+    query = f"DELETE FROM {table} "
+    if indicators is not None:
+        query += "WHERE "
+        cnt = 0
+        for key, value in indicators.items():
+            if cnt > 0:
+                query += ' AND '
+            query += f"{key}='{value}'"
+            cnt += 1
     query += ';'
 
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
