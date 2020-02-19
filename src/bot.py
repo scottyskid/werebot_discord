@@ -8,6 +8,7 @@ import random
 
 import discord
 from discord.ext import commands
+import numpy as np
 import pandas as pd
 
 import database as db
@@ -91,7 +92,7 @@ async def game_init(ctx, game_name='WOLF', starting_date=(date.today() + timedel
     role = db.get_table('role')
     roles_created = {}
     for idx, row in role.iterrows():
-        if row['default_everyone'] == 1:
+        if row['default_value'] == 'everyone':
             continue
         created_role = await guild.create_role(name=f'{game_name}-{row["role_name"]}')
         roles_created[row['role_id']] = created_role
@@ -132,7 +133,7 @@ async def game_init(ctx, game_name='WOLF', starting_date=(date.today() + timedel
     await update_game_permissions(ctx, game_id, 'day')
 
 
-@bot.command(name='game-remove')
+@bot.command(name='game-remove', help='WANING: Removes the entire game from the server (unrecoverable)')
 @commands.has_role('Admin')
 async def game_del(ctx, game_name='wolf'):
     game_name = game_name.upper()
@@ -261,26 +262,31 @@ async def game_assign_characters(ctx, build='primary'):
             await ctx.channel.send(f'{user} has been assigned the role {character["character_display_name"]}')
 
             db.update_table('game_player',  {'character_id': character_id, 'starting_character_id': character_id,
-                             'position': positions[idx], 'living': True, 'current_affiliation': character['starting_affiliation']},
+                             'position': positions[idx], 'vitals': 'alive', 'current_affiliation': character['starting_affiliation']},
                             {'game_id': game_id, 'discord_user_id':player['discord_user_id']})
 
-            game_players = db.get_table('game_player', indicators={'game_id': game_id})
+            # game_players = db.get_table('game_player', indicators={'game_id': game_id})
+
+        await update_game_permissions(ctx, game_id, 'day')
         return
 
 
-
 async def update_game_permissions(ctx, game_id, phase):
-    # todo purge all character permissions first
     # player permissions
     # game_players = db.get_table('game_player', {'game_id': game_id})
     character_permissions = db.get_table('character_permission', joins={'game_player': 'character_id'},
                                          indicators={'game_id': game_id})
-    character_permissions = character_permissions[character_permissions['day_night'].isin([None, phase])]
-    # todo filter out alive or dead
+
+
+    character_permissions = character_permissions[character_permissions['game_phase'].isin([None, phase])]
+    print(character_permissions)
+    #only keep permissions that track living status
+    character_map = character_permissions.apply(lambda x: x['vitals_required'] in [None, x['vitals']], axis=1)
+    character_permissions = character_permissions[character_map]
 
     # role permissions
     role_permissions = db.get_table('role_permission', joins={'game_role': 'role_id'}, indicators={'game_id': game_id})
-    role_permissions = role_permissions[role_permissions['day_night'].isin([None, phase])]
+    role_permissions = role_permissions[role_permissions['game_phase'].isin([None, phase])]
 
     for idx, channel_row in db.get_table('game_channel', {'game_id': game_id}).iterrows():
         channel_id = channel_row['channel_id']
@@ -298,12 +304,24 @@ async def update_game_permissions(ctx, game_id, phase):
             user = ctx.guild.get_role(row['discord_role_id'])
             perms[user][row['permission_name']] = True if int(row['permission_value']) else False
 
+        # ensures default channel cant be seen
+        old_targets = list(channel.overwrites.keys())
+        if ctx.guild.default_role in old_targets:
+            await channel.set_permissions(ctx.guild.default_role, overwrite=discord.PermissionOverwrite(read_messages=False))
+            old_targets.remove(ctx.guild.default_role)
+
         for target, values in perms.items():
+            if target in old_targets:
+                old_targets.remove(target)
             values = discord.PermissionOverwrite(**values)
             await channel.set_permissions(target, overwrite=values)
 
+        # clears out any extra permissions
+        for target in old_targets:
+            await channel.set_permissions(target, overwrite=discord.PermissionOverwrite())
 
-@bot.command(name='phase')
+
+@bot.command(name='phase', help="change the game phase, values accepted [day, night]")
 @commands.has_role('Admin')
 async def game_phase(ctx, phase):
     print('running phase')
@@ -319,10 +337,9 @@ async def game_phase(ctx, phase):
 
 
 
-@bot.command(name='game-start')
+@bot.command(name='game-start', help="starts the game, UNFUNCTIONAL")
 @commands.has_role('Admin')
 async def game_assign_characters(ctx):
-    game_data = await get_game(ctx.channel, 'recruiting')
     game_data = await get_game(ctx.channel, 'recruiting')
     if game_data is not None:
         game_id = game_data['game_id']
@@ -335,20 +352,53 @@ async def game_assign_characters(ctx):
         print(character_permissions)
 
     # todo post about character
-    # todo create !death command
 
-
-@bot.command(name='game-test')
+@bot.command(name='death', help="provide a characters name and tag to kill")
 @commands.has_role('Admin')
-async def game_assign_characters(ctx, build='primary'):
-    await game_del(ctx)
-    await game_init(ctx)
+async def death(ctx, player):
+    game_data = await get_game(ctx.channel, 'recruiting') # todo update this
+    if game_data is not None:
+        game_id = game_data['game_id']
 
-@bot.command(name='game-test-assign')
-@commands.has_role('Admin')
-async def game_assign_characters(ctx, build='primary'):
-    await game_del(ctx)
-    await game_init(ctx)
+        found_member = None
+        for member in ctx.guild.members:
+            if str(member) == player:
+                found_member = member
+                break
+
+        if found_member is None:
+            await ctx.channel.send(f'There is no member called "{player}"')
+            return
+
+        member_data = db.get_table("game_player", indicators={'game_id': game_id, 'discord_user_id': found_member.id})
+        if member_data.empty:
+            await ctx.channel.send(f'"{player}" is not a part of this game')
+            return
+
+        #todo check if already dead
+
+        db.update_table("game_player", data_to_update={'vitals': False},
+                        update_conditions={'game_id': game_id, 'discord_user_id': found_member.id})
+
+        role_data = db.get_table('game_role', joins={'role': 'role_id'}, indicators={'game_id': game_id})
+        deceased_role_id = ctx.guild.get_role(role_data[role_data['default_value'] == 'deceased'].iloc[0]['discord_role_id'])
+        alive_role_id = ctx.guild.get_role(role_data[role_data['default_value'] == 'alive'].iloc[0]['discord_role_id'])
+        await found_member.add_roles(deceased_role_id)
+        await found_member.remove_roles(alive_role_id)
+
+
+
+# @bot.command(name='game-test')
+# @commands.has_role('Admin')
+# async def game_assign_characters(ctx, build='primary'):
+#     await game_del(ctx)
+#     await game_init(ctx)
+#
+# @bot.command(name='game-test-assign')
+# @commands.has_role('Admin')
+# async def game_assign_characters(ctx, build='primary'):
+#     await game_del(ctx)
+#     await game_init(ctx)
 
 @bot.event
 async def on_raw_reaction_add(payload):
@@ -362,11 +412,12 @@ async def on_raw_reaction_add(payload):
 
     # get the value from role that checks it is the default role
     role = db.get_table('role')
-    default_player = role[role['default_player'] == 1]['role_name'].iloc[0]
+    default_player = role[role['default_value'] == 'alive']['role_name'].iloc[0]
 
     for idx, row in game_table.iterrows():
-        if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == '🐺':
+        if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
 
+            #todo use game_role instead for both ad and remove
             member = guild.get_member(payload.user_id)
             role = discord.utils.get(guild.roles, name=f"{row['game_name']}-{default_player}")
             await member.add_roles(role)
@@ -386,7 +437,7 @@ async def on_raw_reaction_remove(payload):
 
     # get the value from role that checkes it is the defualt role
     role = db.get_table('role')
-    default_player = role[role['default_player'] == 1]['role_name'].iloc[0]
+    default_player = role[role['default_value'] == 'alive']['role_name'].iloc[0]
 
     guild = bot.get_guild(payload.guild_id)
     for idx, row in game_table.iterrows():

@@ -71,9 +71,7 @@ def create_database_tables():
                                     role_id INTEGER PRIMARY KEY
                                     ,role_name TEXT
                                     ,role_description TEXT
-                                    ,default_player BOOLEAN
-                                    ,default_narrator BOOLEAN
-                                    ,default_everyone BOOLEAN
+                                    ,default_value TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                 )''')
@@ -84,7 +82,7 @@ def create_database_tables():
                                    ,permission_name INTEGER
                                    ,permission_value INTEGER
                                    ,role_id TEXT
-                                   ,day_night TEXT
+                                   ,game_phase TEXT
                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                    ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
@@ -99,7 +97,7 @@ def create_database_tables():
                                     ,discord_user_id INTEGER NOT NULL
                                     ,current_affiliation TEXT
                                     ,position INTEGER
-                                    ,living BOOLEAN DEFAULT True
+                                    ,vitals BOOLEAN DEFAULT True
                                     ,rounds_survived INTEGER
                                     ,result TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
@@ -180,8 +178,8 @@ def create_database_tables():
                                     ,channel_id INTEGER NOT NULL
                                     ,permission_name TEXT 
                                     ,permission_value TEXT
-                                    ,day_night TEXT
-                                    ,alive BOOLEAN
+                                    ,game_phase TEXT
+                                    ,vitals_required TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now'))
                                     ,FOREIGN KEY(character_id) REFERENCES character(character_id)
@@ -335,16 +333,5 @@ if __name__ == '__main__':
     create_database_tables()
 
     insert_default_data()
-
-    # print(get_table_role_permission().dtypes)
-    # print(get_table('channel'))
-
-    # game_insert(1, 'FIRE', number_of_players=1, game_length=1)
-    #
-    # # insert_into_table('game', {'discord_category_id':1, 'game_name':'FIRE', 'start_date':None, 'end_date':'NULL', 'number_of_players':None})
-    #
-    # print(get_table_schema('game'))
-    # print(get_table('game').iloc[0])
-    # print(get_table('game').dtypes)
 
 
