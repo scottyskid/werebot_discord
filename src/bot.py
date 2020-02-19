@@ -400,56 +400,56 @@ async def death(ctx, player):
 #     await game_del(ctx)
 #     await game_init(ctx)
 
+#todo make these into one function
 @bot.event
 async def on_raw_reaction_add(payload):
     if payload.member.bot == True:
         return
-    # todo only check for  game-announcements
-    game_table = db.get_table('game') # todo change to new structure
-    game_table = game_table[game_table['status'].str.lower() == 'recruiting']
+    channel = bot.get_channel(payload.channel_id)
+    if str(channel) == 'game-announcements':
+        game_table = db.get_table('game', {'status': 'recruiting'})
+        # game_table = game_table[game_table['status'].str.lower() == ]
 
-    guild = bot.get_guild(payload.guild_id)
+        guild = bot.get_guild(payload.guild_id)
 
-    # get the value from role that checks it is the default role
-    role = db.get_table('role')
-    default_player = role[role['default_value'] == 'alive']['role_name'].iloc[0]
+        for idx, row in game_table.iterrows():
+            if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
 
-    for idx, row in game_table.iterrows():
-        if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
+                role_id = db.get_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
+                                       joins={'role': 'role_id'}).iloc[0]['discord_role_id']
+                role = guild.get_role(role_id)
 
-            #todo use game_role instead for both ad and remove
-            member = guild.get_member(payload.user_id)
-            role = discord.utils.get(guild.roles, name=f"{row['game_name']}-{default_player}")
-            await member.add_roles(role)
+                member = guild.get_member(payload.user_id)
+                await member.add_roles(role)
 
-            # add member to database
-            game_player_data = {'game_id': row['game_id'],
-                         'discord_user_id': member.id}
-            db.insert_into_table('game_player', game_player_data)
+                # add member to database
+                game_player_data = {'game_id': row['game_id'],
+                             'discord_user_id': member.id}
+                db.insert_into_table('game_player', game_player_data)
 
-            return
+                return
 
 
 @bot.event
 async def on_raw_reaction_remove(payload):
-    game_table = db.get_table('game')
-    game_table = game_table[game_table['status'].str.lower() == 'recruiting']
+    game_table = db.get_table('game', {'status': 'recruiting'})
 
-    # get the value from role that checkes it is the defualt role
-    role = db.get_table('role')
-    default_player = role[role['default_value'] == 'alive']['role_name'].iloc[0]
+    channel = bot.get_channel(payload.channel_id)
+    if str(channel) == 'game-announcements':
 
-    guild = bot.get_guild(payload.guild_id)
-    for idx, row in game_table.iterrows():
-        if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
-            member = guild.get_member(payload.user_id)
+        guild = bot.get_guild(payload.guild_id)
+        for idx, row in game_table.iterrows():
+            if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
+                role_id = db.get_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
+                                       joins={'role': 'role_id'}).iloc[0]['discord_role_id']
+                role = guild.get_role(role_id)
 
-            role = discord.utils.get(guild.roles, name=f"{row['game_name']}-{default_player}")
-            await member.remove_roles(role)
+                member = guild.get_member(payload.user_id)
+                await member.remove_roles(role)
 
-            db.delete_from_table('game_player', {'game_id': row['game_id'], 'discord_user_id': member.id})
+                db.delete_from_table('game_player', {'game_id': row['game_id'], 'discord_user_id': member.id})
 
-            return
+                return
 
 
 @bot.event
