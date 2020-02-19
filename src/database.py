@@ -173,13 +173,13 @@ def create_database_tables():
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(role_id) REFERENCES role(role_id)
                                 )''')
-            # create table GAME_PERMISSION
+            # create table CHARACTER_PERMISSION
             cursor.execute('''CREATE TABLE IF NOT EXISTS character_permission(
                                     character_permission_id INTEGER PRIMARY KEY AUTOINCREMENT
                                     ,character_id INTEGER NOT NULL
                                     ,channel_id INTEGER NOT NULL
                                     ,permission_name TEXT 
-                                    ,permission_level TEXT
+                                    ,permission_value TEXT
                                     ,day_night TEXT
                                     ,alive BOOLEAN
                                     ,created_datetime DATETIME DEFAULT (datetime('now'))
@@ -285,6 +285,36 @@ def delete_from_table(table, indicators=None):
         except Exception as e:
             db.rollback()
             raise e
+
+def update_table(table, data_to_update, update_conditions):
+    values = []
+    num = 0
+    with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
+
+        try:
+            cursor = db.cursor()
+
+            query = f"UPDATE {table}"
+            for key, value in data_to_update.items():
+                query += ", " if num else '\nSET '
+                query += f"{key} = ?"
+                values.append(str(value))
+                num += 1
+            num = 0
+            for key, value in update_conditions.items():
+                query += " AND " if num else '\nWHERE '
+                query += f"{key} = ?"
+                values.append(str(value))
+                num += 1
+
+            query += f";"
+            values = tuple(values)
+
+            cursor.execute(query, values)
+        except Exception as e:
+            db.rollback()
+            raise e
+
 
 
 def insert_default_data():
