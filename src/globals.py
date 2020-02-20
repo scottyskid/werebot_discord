@@ -12,6 +12,8 @@ DB_FILE_LOCATION = BASE_DIR / 'data' / 'uw.db'
 
 GAME_REACTION_EMOJI  = '🐺'
 
+moderator_channel_name = 'moderator'
+
 
 def setup_logging(default_path, default_level=logging.WARNING):
     """Setup logging configuration

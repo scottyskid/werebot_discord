@@ -181,7 +181,7 @@ async def character_add(ctx, characters, build='primary'):
     characters = characters.lower()
 
     game_data = await get_game(ctx.channel, 'recruiting')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         character_data  = db.get_table('character')
@@ -212,7 +212,7 @@ async def character_list(ctx, build='primary'):
     build = build.lower()
 
     game_data = await get_game(ctx.channel, 'recruiting')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build},
@@ -230,7 +230,7 @@ async def character_build_purge(ctx, build='primary'):
     build = build.lower()
 
     game_data = await get_game(ctx.channel, 'recruiting')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         db.delete_from_table('game_character', indicators={'game_id': game_id, 'build_name': build})
@@ -243,25 +243,28 @@ async def game_assign_characters(ctx, build='primary'):
     build = build.lower()
 
     game_data = await get_game(ctx.channel, 'initializing')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         game_players = db.get_table('game_player', indicators={'game_id':game_id})
         game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}).sample(frac=1)
 
-        if game_players.shape[0] != game_characters.shape[0]:
-            await ctx.channel.send(f'players ({game_players.shape[0]}) and characters ({game_characters.shape[0]}) must be equal')
+        correct_chars = await game_has_correct_chars(ctx, game_id, build)
+        if not correct_chars:
             return
 
         await ctx.channel.send(f'you have {game_players.shape[0]} players and {game_characters.shape[0]}  characters')
 
         positions = list(range(1, game_players.shape[0] + 1))
         random.shuffle(positions)
+        table = Texttable()
+        table.header(['User', 'Role Assigned'])
         for idx, player in game_players.iterrows():
             user = ctx.guild.get_member(player['discord_user_id'])
             character_id = game_characters['character_id'].iloc[idx]
             character = db.get_table('character', indicators={'character_id': character_id}).iloc[0]
-            await ctx.channel.send(f'{user} has been assigned the role {character["character_display_name"]}')
+
+            table.add_row([user, character["character_display_name"]])
 
             db.update_table('game_player',  {'character_id': character_id, 'starting_character_id': character_id,
                              'position': positions[idx], 'vitals': 'alive', 'current_affiliation': character['starting_affiliation']},
@@ -269,6 +272,7 @@ async def game_assign_characters(ctx, build='primary'):
 
             # game_players = db.get_table('game_player', indicators={'game_id': game_id})
 
+        await ctx.channel.send(f'```{table.draw()}```')
         await update_game_permissions(ctx, game_id, 'day')
         return
 
@@ -322,17 +326,31 @@ async def update_game_permissions(ctx, game_id, phase):
             await channel.set_permissions(target, overwrite=discord.PermissionOverwrite())
 
 
+async def game_has_correct_chars(ctx, game_id, build) -> bool:
+    game_players = db.get_table('game_player', indicators={'game_id': game_id})
+    game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}).sample(
+        frac=1)
+    if game_players.shape[0] != game_characters.shape[0] or game_players.shape[0] <= 0:
+        await ctx.channel.send(
+            f'players ({game_players.shape[0]}) and characters ({game_characters.shape[0]}) must be equal')
+        return False
+    return True
+
+
+
 @bot.command(name='phase', help="change the game phase, values accepted [day, night]")
 @commands.has_role('Admin')
 async def game_phase(ctx, phase):
     print('running phase')
 
-    if phase not in ['day', 'night']:
-        await ctx.channel.send(f'not a valid phase')
-        return
+
 
     game_data = await get_game(ctx.channel, 'active')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+        if phase not in ['day', 'night']:
+            await ctx.channel.send(f'not a valid phase')
+            return
+
         game_id = game_data['game_id']
         await update_game_permissions(ctx, game_id, phase)
 
@@ -344,7 +362,7 @@ def get_game_player_status(ctx, game_id):
     guild = ctx.guild
 
     table = Texttable()
-    table.header(['Position', 'User', 'Status']) # todo add in character if deceased
+    table.header(['Virtual Position', 'User', 'Status']) # todo add in character if deceased
 
     for idx, row in game_players.iterrows():
         user = guild.get_member(row['discord_user_id'])
@@ -355,9 +373,8 @@ def get_game_player_status(ctx, game_id):
 @bot.command(name='game-info', help="prints info about the current game")
 @commands.has_role('Admin')
 async def game_info (ctx):
-    print(db.get_table('game'))
-    game_data = await get_game(ctx.channel) #todo set to only "active" after testing
-    if game_data is not None:
+    game_data = await get_game(ctx.channel)
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         table = Texttable()
@@ -372,20 +389,25 @@ async def game_info (ctx):
 @commands.has_role('Admin')
 async def game_player_status(ctx):
     game_data = await get_game(ctx.channel) #todo set to only "active" after testing
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         status_post = get_game_player_status(ctx, game_id)
         await ctx.channel.send(f'{status_post}')
 
 
+
 @bot.command(name='game-start', help="starts the game, assigns and updates permsissions UNFUNCTIONAL")
 @commands.has_role('Admin')
 async def game_start (ctx, build='primary'):
     game_data = await get_game(ctx.channel, 'recruiting')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
-        # todo add try except here
+
+        correct_chars = await game_has_correct_chars(ctx, game_id, build)
+        if not correct_chars:
+            return
+
         db.update_table('game', {'status': 'initializing'}, {'game_id': game_id}) #todo add number of players
 
         await game_assign_characters(ctx, build)
@@ -401,7 +423,7 @@ async def game_start (ctx, build='primary'):
 @commands.has_role('Admin')
 async def game_complete (ctx):
     game_data = await get_game(ctx.channel, 'active')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         db.update_table('game', {'status': 'completed'}, {'game_id': game_id})
@@ -413,7 +435,7 @@ async def game_complete (ctx):
 @commands.has_role('Admin')
 async def death(ctx, player):
     game_data = await get_game(ctx.channel, 'active')
-    if game_data is not None:
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         found_member = None
