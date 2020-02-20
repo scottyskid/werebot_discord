@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands
 import numpy as np
 import pandas as pd
+from texttable import Texttable
 
 import database as db
 import globals
@@ -169,7 +170,8 @@ async def get_game(channel, check_status=None):
         if check_status is not None and game_data['status'].lower() != check_status:
             await channel.send(f'{game_data["game_name"]} is not in the {check_status} stage, this will have no affect')
             return None
-    return game_data
+        return game_data
+    return None
 
 
 @bot.command(name='character-add', help='Add a character to staging, can only be used in a game category')
@@ -200,7 +202,7 @@ async def character_add(ctx, characters, build='primary'):
 
         game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build})
 
-        await ctx.channel.send(f'SUCCESS! you have a total of {game_character.shape[0]} characters in build {build}')
+        await ctx.channel.send(f'SUCCESS! you have a total of {game_character.shape[0]} characters in build "{build}"')
         return
 
 
@@ -240,7 +242,7 @@ async def character_build_purge(ctx, build='primary'):
 async def game_assign_characters(ctx, build='primary'):
     build = build.lower()
 
-    game_data = await get_game(ctx.channel, 'recruiting')
+    game_data = await get_game(ctx.channel, 'initializing')
     if game_data is not None:
         game_id = game_data['game_id']
 
@@ -279,7 +281,6 @@ async def update_game_permissions(ctx, game_id, phase):
 
 
     character_permissions = character_permissions[character_permissions['game_phase'].isin([None, phase])]
-    print(character_permissions)
     #only keep permissions that track living status
     character_map = character_permissions.apply(lambda x: x['vitals_required'] in [None, x['vitals']], axis=1)
     character_permissions = character_permissions[character_map]
@@ -330,33 +331,88 @@ async def game_phase(ctx, phase):
         await ctx.channel.send(f'not a valid phase')
         return
 
-    game_data = await get_game(ctx.channel)
+    game_data = await get_game(ctx.channel, 'active')
     if game_data is not None:
         game_id = game_data['game_id']
         await update_game_permissions(ctx, game_id, phase)
 
 
+def get_game_player_status(ctx, game_id):
+    game_players = db.get_table('game_player', {'game_id': game_id})
+    print(game_players.dtypes)
+    game_players = game_players.sort_values('position')
+    guild = ctx.guild
 
-@bot.command(name='game-start', help="starts the game, UNFUNCTIONAL")
+    table = Texttable()
+    table.header(['Position', 'User', 'Status']) # todo add in character if deceased
+
+    for idx, row in game_players.iterrows():
+        user = guild.get_member(row['discord_user_id'])
+        table.add_row([row['position'], user, row['vitals']])
+    return f'```{table.draw()}```'
+
+
+@bot.command(name='game-info', help="prints info about the current game")
 @commands.has_role('Admin')
-async def game_assign_characters(ctx):
-    game_data = await get_game(ctx.channel, 'recruiting')
+async def game_info (ctx):
+    print(db.get_table('game'))
+    game_data = await get_game(ctx.channel) #todo set to only "active" after testing
     if game_data is not None:
         game_id = game_data['game_id']
 
-        game_players = db.get_table('game_player', {'game_id': game_id})
-        character_permissions = db.get_table('character_permission')
+        table = Texttable()
+        table.header(['ID', 'Name', 'Status', 'Start Date'])  # todo add in character if deceased
 
-        # todo change the game status
+        table.add_row([game_data['game_id'], game_data['game_name'], game_data['status'], game_data['start_date']])
 
-        print(character_permissions)
+        await ctx.channel.send(f'```{table.draw()}```')
 
-    # todo post about character
 
-@bot.command(name='death', help="provide a characters name and tag to kill")
+@bot.command(name='game-player-status', help="prints out the current state of all players")
+@commands.has_role('Admin')
+async def game_player_status(ctx):
+    game_data = await get_game(ctx.channel) #todo set to only "active" after testing
+    if game_data is not None:
+        game_id = game_data['game_id']
+
+        status_post = get_game_player_status(ctx, game_id)
+        await ctx.channel.send(f'{status_post}')
+
+
+@bot.command(name='game-start', help="starts the game, assigns and updates permsissions UNFUNCTIONAL")
+@commands.has_role('Admin')
+async def game_start (ctx, build='primary'):
+    game_data = await get_game(ctx.channel, 'recruiting')
+    if game_data is not None:
+        game_id = game_data['game_id']
+        # todo add try except here
+        db.update_table('game', {'status': 'initializing'}, {'game_id': game_id}) #todo add number of players
+
+        await game_assign_characters(ctx, build)
+        await update_game_permissions(ctx, game_id, 'day')
+
+        status_post = get_game_player_status(ctx, game_id)
+        await ctx.channel.send(f'{status_post}') # todo send this to the "player" channel
+
+        db.update_table('game', {'status': 'active'}, {'game_id': game_id})
+
+
+@bot.command(name='game-complete', help="completes a game")
+@commands.has_role('Admin')
+async def game_complete (ctx):
+    game_data = await get_game(ctx.channel, 'active')
+    if game_data is not None:
+        game_id = game_data['game_id']
+
+        db.update_table('game', {'status': 'completed'}, {'game_id': game_id})
+
+
+
+
+@bot.command(name='death', help='provide a characters name and tag to kill in the form of "player#0000"')
 @commands.has_role('Admin')
 async def death(ctx, player):
-    game_data = await get_game(ctx.channel, 'recruiting') # todo update this
+    game_data = await get_game(ctx.channel, 'active')
     if game_data is not None:
         game_id = game_data['game_id']
 
@@ -377,7 +433,7 @@ async def death(ctx, player):
 
         #todo check if already dead
 
-        db.update_table("game_player", data_to_update={'vitals': False},
+        db.update_table("game_player", data_to_update={'vitals': 'deceased'},
                         update_conditions={'game_id': game_id, 'discord_user_id': found_member.id})
 
         role_data = db.get_table('game_role', joins={'role': 'role_id'}, indicators={'game_id': game_id})
@@ -386,19 +442,6 @@ async def death(ctx, player):
         await found_member.add_roles(deceased_role_id)
         await found_member.remove_roles(alive_role_id)
 
-
-
-# @bot.command(name='game-test')
-# @commands.has_role('Admin')
-# async def game_assign_characters(ctx, build='primary'):
-#     await game_del(ctx)
-#     await game_init(ctx)
-#
-# @bot.command(name='game-test-assign')
-# @commands.has_role('Admin')
-# async def game_assign_characters(ctx, build='primary'):
-#     await game_del(ctx)
-#     await game_init(ctx)
 
 #todo make these into one function
 @bot.event

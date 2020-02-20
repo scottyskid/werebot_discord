@@ -1,4 +1,5 @@
 from __future__ import print_function
+from datetime import datetime
 import logging
 import os
 import sqlite3
@@ -27,8 +28,8 @@ def create_database_tables():
                                     ,number_of_players INTEGER
                                     ,status TEXT
                                     ,game_length INTEGER
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                )''')
             # create table CHANNEL
             cursor.execute('''CREATE TABLE IF NOT EXISTS channel(
@@ -37,8 +38,8 @@ def create_database_tables():
                                     ,channel_order INTEGER
                                     ,channel_topic TEXT
                                     ,channel_type TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                )''')
             # create table CHARACTER
             cursor.execute('''CREATE TABLE IF NOT EXISTS character(
@@ -53,8 +54,8 @@ def create_database_tables():
                                     ,char_short_description TEXT
                                     ,char_card_description TEXT
                                     ,char_full_description TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                 )''')
             # create table EVENT
             cursor.execute('''CREATE TABLE IF NOT EXISTS event(
@@ -62,8 +63,8 @@ def create_database_tables():
                                     ,event_name TEXT
                                     ,event_description TEXT
                                     ,character_acting_id INTEGER
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(character_acting_id) REFERENCES character(character_id)
                                 )''')
             # create table ROLE
@@ -72,8 +73,8 @@ def create_database_tables():
                                     ,role_name TEXT
                                     ,role_description TEXT
                                     ,default_value TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                 )''')
             # create table ROLE_PERMISSION
             cursor.execute('''CREATE TABLE IF NOT EXISTS role_permission (
@@ -83,8 +84,8 @@ def create_database_tables():
                                    ,permission_value INTEGER
                                    ,role_id TEXT
                                    ,game_phase TEXT
-                                   ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                   ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                   ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
                                    ,FOREIGN KEY(role_id) REFERENCES role(role_id)
                                )''')
@@ -100,8 +101,8 @@ def create_database_tables():
                                     ,vitals BOOLEAN DEFAULT True
                                     ,rounds_survived INTEGER
                                     ,result TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(character_id) REFERENCES character(character_id)
                                     ,FOREIGN KEY(starting_character_id) REFERENCES character(character_id)
@@ -114,8 +115,8 @@ def create_database_tables():
                                     ,round_received INTEGER
                                     ,active BOOLEAN DEFAULT True
                                     ,duration INTEGER
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_player_id) REFERENCES game_player(game_player_id)
                                 )''')
             # create table GAME_CHARACTER
@@ -125,8 +126,8 @@ def create_database_tables():
                                    ,character_id INTEGER NOT NULL
                                    ,build_name TEXT
                                    ,will_play BOOLEAN DEFAULT True
-                                   ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                   ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                   ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                   ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                    ,FOREIGN KEY(character_id) REFERENCES character(character_id)
                                )''')
@@ -140,8 +141,8 @@ def create_database_tables():
                                     ,player_affected_id INTEGER
                                     ,round INTEGER
                                     ,datetime DATETIME DEFAULT (datetime('now'))
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(event_id) REFERENCES event(event_id)
                                     ,FOREIGN KEY(player_acting_id) REFERENCES game_player(game_player_id)
@@ -154,8 +155,8 @@ def create_database_tables():
                                     ,channel_id INTEGER NOT NULL
                                     ,discord_channel_id INTEGER NOT NULL
                                     ,name TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
                                 )''')
@@ -166,8 +167,8 @@ def create_database_tables():
                                     ,role_id INTEGER NOT NULL
                                     ,discord_role_id INTEGER NOT NULL
                                     ,game_role_name TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(role_id) REFERENCES role(role_id)
                                 )''')
@@ -180,8 +181,8 @@ def create_database_tables():
                                     ,permission_value TEXT
                                     ,game_phase TEXT
                                     ,vitals_required TEXT
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(character_id) REFERENCES character(character_id)
                                     ,FOREIGN KEY(channel_id) REFERENCES channel(channel_id)
                                 )''')
@@ -194,8 +195,8 @@ def create_database_tables():
                                     ,vote_type TEXT
                                     ,round INTEGER
                                     ,datetime DATETIME DEFAULT (datetime('now'))
-                                    ,created_datetime DATETIME DEFAULT (datetime('now'))
-                                    ,modified_datetime DATETIME DEFAULT (datetime('now'))
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_id) REFERENCES game(game_id)
                                     ,FOREIGN KEY(voter) REFERENCES game_player(game_player_id)
                                     ,FOREIGN KEY(nominee) REFERENCES game_player(game_player_id)
@@ -207,7 +208,7 @@ def create_database_tables():
             raise e
 
 
-def insert_into_table(table, data):
+def insert_into_table(table:str, data):
     columns = ''
     values  = []
     num_values = 0
@@ -216,7 +217,7 @@ def insert_into_table(table, data):
         if type(data) == pd.DataFrame:
             data.to_sql(table, db, if_exists='append', index=False)
             return None
-        elif type(data) == dict: # todo extent do dataframes and lists
+        elif type(data) == dict:
             for key, value in data.items():
                 if value is None:
                     continue
@@ -240,7 +241,7 @@ def game_insert(discord_category_id, game_name, start_date=None, end_date=None, 
     insert_into_table('game', locals())
 
 
-def get_table(table, indicators=None, joins=None):
+def get_table(table:str, indicators:dict=None, joins:dict=None):
     query = f'SELECT * from {table}'
     if joins is not None:
         for key, value in joins.items():
@@ -258,12 +259,12 @@ def get_table(table, indicators=None, joins=None):
         return pd.read_sql_query(query, db)
 
 
-def get_table_schema(table):
+def get_table_schema(table: str):
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
         return pd.read_sql_query(f"pragma table_info('{table}')", db)
 
 
-def delete_from_table(table, indicators=None):
+def delete_from_table(table: str, indicators=None):
     query = f"DELETE FROM {table} "
     if indicators is not None:
         query += "WHERE "
@@ -284,13 +285,15 @@ def delete_from_table(table, indicators=None):
             db.rollback()
             raise e
 
-def update_table(table, data_to_update, update_conditions):
+def update_table(table: str, data_to_update: dict, update_conditions: dict):
     values = []
     num = 0
     with sqlite3.connect(globals.DB_FILE_LOCATION) as db:
 
         try:
             cursor = db.cursor()
+
+            data_to_update['modified_datetime'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             query = f"UPDATE {table}"
             for key, value in data_to_update.items():
