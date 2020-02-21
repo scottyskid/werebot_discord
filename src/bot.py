@@ -23,7 +23,7 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
 
 
-@bot.command(name='game-create')
+@bot.command(name='game-create', help='Create a game and its associated Category, channels, roles and permissions')
 @commands.has_role('Admin')
 async def game_init(ctx, game_name='WOLF', starting_date=(date.today() + timedelta(days=1)).strftime("%y-%m-%d")):
     game_name = game_name.upper()
@@ -139,6 +139,7 @@ async def game_init(ctx, game_name='WOLF', starting_date=(date.today() + timedel
 @bot.command(name='game-remove', help='WANING: Removes the entire game from the server (unrecoverable)')
 @commands.has_role('Admin')
 async def game_del(ctx, game_name='wolf'):
+    #todo only allow to be done inside the moderator channel of a game
     game_name = game_name.upper()
     guild = ctx.guild
     category = discord.utils.get(guild.categories, name=game_name)
@@ -177,18 +178,24 @@ async def get_game(channel, check_status:game_status=None):
     return None
 
 
-@bot.command(name='character-add', help='Add a character to staging, can only be used in a game category')
+def parse_character_list(characters):
+    character_list = characters.split(',')
+    #todo include quantity variables
+    return character_list
+
+@bot.command(name='character-add', help='Add a character to build, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
 @commands.has_role('Admin')
 async def character_add(ctx, characters, build='primary'):
     build = build.lower()
     characters = characters.lower()
+    #todo check total characters added doesnt go over the max_duplicates in the character table
 
     game_data = await get_game(ctx.channel, game_status.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         character_data  = db.get_table('character')
-        character_list = characters.split(',')
+        character_list = parse_character_list(characters)
         for character in character_list:
 
             character_info = character_data[character_data['character_name'] == character]
@@ -205,9 +212,82 @@ async def character_add(ctx, characters, build='primary'):
 
         game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build})
 
-        await ctx.channel.send(f'SUCCESS! you have a total of {game_character.shape[0]} characters in build "{build}"')
+        # await ctx.channel.send(f'SUCCESS! you have a total of {game_character.shape[0]} characters in build "{build}"') #todo show character-build-list here rather than this
+        table = characters_in_build_table(game_id, build)
+        await ctx.channel.send(f'Updated Build "{build}"\n```{table.draw()}```')
         return
 
+
+@bot.command(name='character-remove', help='UNFUNCTIONAL, Remove a character from a build, characters can be provieded in the same manner as character-add')
+@commands.has_role('Admin')
+async def character_add(ctx, characters, build='primary'):
+    build = build.lower()
+    characters = characters.lower()
+
+    game_data = await get_game(ctx.channel, game_status.RECRUITING)
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+        game_id = game_data['game_id']
+
+        game_character_data  = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}, joins={'character': 'character_id'})
+        character_list = parse_character_list(characters)
+
+        game_character_ids_remove = []
+        for character in character_list:
+            selected = game_character_data[game_character_data['character_name'] == character]
+            selected = selected[~selected['game_character_id'].isin(game_character_ids_remove)]
+            if selected.empty:
+                await ctx.channel.send(f'character "{character}" was not found in build "{build}" and has not been remove (could be due specifying more than were in the build)')
+                continue
+            row = selected.iloc[0]
+            game_character_ids_remove.append(row['game_character_id'])
+
+        for cur_id in game_character_ids_remove:
+            db.delete_from_table('game_character',  indicators={'game_character_id': cur_id})
+
+        table = characters_in_build_table(game_id, build)
+        await ctx.channel.send(f'Updated Build "{build}"\n```{table.draw()}```')
+
+
+
+@bot.command(name='builds-available', help='List all available builds to this game')
+@commands.has_role('Admin')
+async def builds_available(ctx):
+
+    game_data = await get_game(ctx.channel, game_status.RECRUITING)
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+        game_id = game_data['game_id']
+
+        builds = db.get_table('game_character', indicators={'game_id': game_id}, joins={'character': 'character_id'})
+        builds = builds.groupby('build_name').count().reset_index()[['build_name', 'game_character_id']]
+
+        table = Texttable()
+        table.header(['Build Name', 'Total Characters'])
+
+        for idx, row in builds.iterrows():
+            table.add_row([row['build_name'], row['game_character_id']])
+
+        await ctx.channel.send(f'```{table.draw()}```')
+
+
+def characters_in_build_table(game_id, build):
+    game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build},
+                                  joins={'character': 'character_id'})
+    game_character = game_character.sort_values('character_name')
+
+    # groups characters into quantities rather than indvidual items
+    characters = defaultdict(int)
+    for idx, character in game_character.iterrows():
+        characters[character['character_name']] += 1
+
+    table = Texttable()
+    table.header(['Character', 'Quantity'])
+
+    for key, value in characters.items():
+        table.add_row([key, value])
+
+    table.add_row(['TOTAL', game_character.shape[0]])
+
+    return table
 
 @bot.command(name='character-build-list', help='List all characters in selected build')
 @commands.has_role('Admin')
@@ -218,13 +298,9 @@ async def character_list(ctx, build='primary'):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build},
-                                      joins={'character': 'character_id'})
-        text = f'Characters currently assigned to build {build}'
-        for idx, character in game_character.iterrows():
-            text += f"\n{character['character_name']}"
-        text += f'\n{game_character.shape[0]} total'
-        await ctx.channel.send(text)
+        table = characters_in_build_table(game_id, build)
+
+        await ctx.channel.send(f'Build "{build}"\n```{table.draw()}```')
 
 
 @bot.command(name='character-build-purge', help='Removes all characters in selected build')
@@ -347,8 +423,6 @@ async def game_has_correct_chars(ctx, game_id, build) -> bool:
 @commands.has_role('Admin')
 async def game_phase(ctx, phase):
     print('running phase')
-
-
 
     game_data = await get_game(ctx.channel, game_status.ACTIVE)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
