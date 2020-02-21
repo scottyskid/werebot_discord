@@ -178,9 +178,23 @@ async def get_game(channel, check_status:game_status=None):
     return None
 
 
-def parse_character_list(characters):
-    character_list = characters.split(',')
-    #todo include quantity variables
+async def parse_character_list(ctx, characters):
+    character_split = characters.split(',')
+    character_list = []
+    for character in character_split:
+        split = character.split('|')
+        if len(split) == 1:
+            character_list.append(character)
+            continue
+        elif len(split) == 2:
+            if split[1].isdigit():
+                for i in range(int(split[1])):
+                    character_list.append(split[0])
+                continue
+
+        # left here to catch anything that isnt parsed by the if above
+        await ctx.channel.send(f'invalid argument "{character}" and has been ignored')
+
     return character_list
 
 @bot.command(name='character-add', help='Add a character to build, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
@@ -195,7 +209,7 @@ async def character_add(ctx, characters, build='primary'):
         game_id = game_data['game_id']
 
         character_data  = db.get_table('character')
-        character_list = parse_character_list(characters)
+        character_list = await parse_character_list(ctx, characters)
         for character in character_list:
 
             character_info = character_data[character_data['character_name'] == character]
@@ -210,9 +224,6 @@ async def character_add(ctx, characters, build='primary'):
                                    'build_name': build, 'will_play': True}
             db.insert_into_table('game_character', game_character_data)
 
-        game_character = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build})
-
-        # await ctx.channel.send(f'SUCCESS! you have a total of {game_character.shape[0]} characters in build "{build}"') #todo show character-build-list here rather than this
         table = characters_in_build_table(game_id, build)
         await ctx.channel.send(f'Updated Build "{build}"\n```{table.draw()}```')
         return
@@ -220,7 +231,7 @@ async def character_add(ctx, characters, build='primary'):
 
 @bot.command(name='character-remove', help='UNFUNCTIONAL, Remove a character from a build, characters can be provieded in the same manner as character-add')
 @commands.has_role('Admin')
-async def character_add(ctx, characters, build='primary'):
+async def character_remove(ctx, characters, build='primary'):
     build = build.lower()
     characters = characters.lower()
 
@@ -229,7 +240,7 @@ async def character_add(ctx, characters, build='primary'):
         game_id = game_data['game_id']
 
         game_character_data  = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}, joins={'character': 'character_id'})
-        character_list = parse_character_list(characters)
+        character_list = await parse_character_list(ctx, characters)
 
         game_character_ids_remove = []
         for character in character_list:
@@ -246,7 +257,6 @@ async def character_add(ctx, characters, build='primary'):
 
         table = characters_in_build_table(game_id, build)
         await ctx.channel.send(f'Updated Build "{build}"\n```{table.draw()}```')
-
 
 
 @bot.command(name='builds-available', help='List all available builds to this game')
