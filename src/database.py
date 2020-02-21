@@ -27,6 +27,7 @@ def create_database_tables():
                                     ,end_date DATE
                                     ,number_of_players INTEGER
                                     ,status TEXT
+                                    ,phase TEXT
                                     ,game_length INTEGER
                                     ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -83,6 +84,7 @@ def create_database_tables():
                                    ,permission_name INTEGER
                                    ,permission_value INTEGER
                                    ,role_id TEXT
+                                   ,game_status TEXT
                                    ,game_phase TEXT
                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -179,6 +181,7 @@ def create_database_tables():
                                     ,channel_id INTEGER NOT NULL
                                     ,permission_name TEXT 
                                     ,permission_value TEXT
+                                    ,game_status TEXT
                                     ,game_phase TEXT
                                     ,vitals_required TEXT
                                     ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
