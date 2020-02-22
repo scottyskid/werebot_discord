@@ -232,18 +232,19 @@ def get_game_player_status(ctx, game_id):
     return f'```{table.draw()}```'
 
 
-async def game_assign_characters(ctx, build):
-    build = build.lower()
+async def game_assign_characters(ctx, scenario):
+    scenario = scenario.lower()
 
     game_data = await get_game(ctx.channel, game_status.INITIALIZING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         game_players = db.get_table('game_player', indicators={'game_id': game_id})
-        game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}).sample(
+        game_characters = db.get_table('game_character',
+                                       indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
             frac=1)
 
-        correct_chars = await game_has_correct_chars(ctx, game_id, build)
+        correct_chars = await game_has_correct_chars(ctx, game_id, scenario)
         if not correct_chars:
             return
 
@@ -272,9 +273,9 @@ async def game_assign_characters(ctx, build):
         return
 
 
-async def game_has_correct_chars(ctx, game_id, build) -> bool:
+async def game_has_correct_chars(ctx, game_id, scenario) -> bool:
     game_players = db.get_table('game_player', indicators={'game_id': game_id})
-    game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'build_name': build}).sample(
+    game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
         frac=1)
     if game_players.shape[0] != game_characters.shape[0] or game_players.shape[0] <= 0:
         await ctx.channel.send(
@@ -320,19 +321,19 @@ async def player_status(ctx):
         await ctx.channel.send(f'{status_post}')
 
 
-async def start(ctx, build):
+async def start(ctx, scenario):
     game_data = await get_game(ctx.channel, game_status.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        correct_chars = await game_has_correct_chars(ctx, game_id, build)
+        correct_chars = await game_has_correct_chars(ctx, game_id, scenario)
         if not correct_chars:
             return
 
         db.update_table('game', {'status': game_status.INITIALIZING.value},
                         {'game_id': game_id})  # todo add number of players
 
-        await game_assign_characters(ctx, build)
+        await game_assign_characters(ctx, scenario)
         await update_game_permissions(ctx, game_id, 'day')
 
         status_post = get_game_player_status(ctx, game_id)

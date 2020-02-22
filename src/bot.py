@@ -57,8 +57,8 @@ class Game(commands.Cog):
 
     @commands.command(name='game-start', help="starts the game, assigns and updates permsissions")
     @commands.has_role('Admin')
-    async def game_start(self, ctx, build='primary'):
-        return await game.start(ctx, build)
+    async def game_start(self, ctx, scenario='primary'):
+        return await game.start(ctx, scenario)
 
     @commands.command(name='game-complete', help="completes a game")
     @commands.has_role('Admin')
@@ -76,10 +76,10 @@ class Game(commands.Cog):
         return await game.phase_set(ctx, phase)
 
     @commands.command(name='game-assign-characters',
-                      help='Deprechiated. Randomly assigns the characters of a build to characters')
+                      help='Deprechiated. Randomly assigns the characters of a scenario to characters')
     @commands.has_role('Admin')
-    async def game_assign_characters(self, ctx, build='primary'):
-        return await game.game_assign_characters(ctx, build)
+    async def game_assign_characters(self, ctx, scenario='primary'):
+        return await game.game_assign_characters(ctx, scenario)
 
 
 class Scenario(commands.Cog):
@@ -87,31 +87,31 @@ class Scenario(commands.Cog):
         self.bot = bot
 
     @commands.command(name='character-add',
-                      help='Add a character to build, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
+                      help='Add a character to scenario, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
     @commands.has_role('Admin')
-    async def character_add(self, ctx, characters, build='primary'):
-        return await scenario.character_add(ctx, characters, build)
+    async def character_add(self, ctx, characters, scenario_name='primary'):
+        return await scenario.character_add(ctx, characters, scenario_name)
 
     @commands.command(name='character-remove',
-                      help='Remove a character from a build, characters can be provieded in the same manner as character-add')
+                      help='Remove a character from a scenario, characters can be provieded in the same manner as character-add')
     @commands.has_role('Admin')
-    async def character_remove(self, ctx, characters, build='primary'):
-        return await scenario.character_remove(ctx, characters, build)
+    async def character_remove(self, ctx, characters, scenario_name='primary'):
+        return await scenario.character_remove(ctx, characters, scenario_name)
 
-    @commands.command(name='builds-available', help='List all available builds to this game')
+    @commands.command(name='scenarios-available', help='List all available scenarios to this game')
     @commands.has_role('Admin')
-    async def builds_available(self, ctx):
-        return await scenario.builds_available(ctx)
+    async def scenarios_available(self, ctx):
+        return await scenario.scenarios_available(ctx)
 
-    @commands.command(name='character-build-list', help='List all characters in selected build')
+    @commands.command(name='character-scenario-list', help='List all characters in selected scenario')
     @commands.has_role('Admin')
-    async def character_list(self, ctx, build='primary'):
-        return await scenario.character_list(ctx, build)
+    async def character_list(self, ctx, scenario_name='primary'):
+        return await scenario.character_list(ctx, scenario_name)
 
-    @commands.command(name='character-build-purge', help='Removes all characters in selected build')
+    @commands.command(name='character-scenario-purge', help='Removes all characters in selected scenario')
     @commands.has_role('Admin')
-    async def character_build_purge(self, ctx, build='primary'):
-        return await scenario.character_build_purge(ctx, build)
+    async def character_scenario_purge(self, ctx, scenario_name='primary'):
+        return await scenario.character_scenario_purge(ctx, scenario_name)
 
 
 class Event(commands.Cog):

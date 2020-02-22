@@ -126,7 +126,7 @@ def create_database_tables():
                                    game_character_id INTEGER PRIMARY KEY AUTOINCREMENT
                                    ,game_id INTEGER NOT NULL
                                    ,character_id INTEGER NOT NULL
-                                   ,build_name TEXT
+                                   ,scenario_name TEXT
                                    ,will_play BOOLEAN DEFAULT True
                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
