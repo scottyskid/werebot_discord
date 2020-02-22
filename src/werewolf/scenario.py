@@ -16,6 +16,27 @@ from globals import game_status
 from werewolf import game
 
 
+async def create(ctx, scenario_name, scope):
+    scenario_name = scenario_name.lower()  # todo replace spaces with underscores
+
+    if scope == 'local':
+        game_data = await game.get_game(ctx.channel, game_status.RECRUITING)
+        if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+            game_id = game_data['game_id']
+        else:
+            await ctx.channel.send(f'local scope must be created in side a moderator channel of a game')
+            return
+    elif scope == 'global':
+        game_id = None
+    else:
+        await ctx.channel.send(f'scope provided must be either "local" or "global"')
+        return
+
+    # todo check scenario name not already used
+
+    db.insert_into_table('scenario', {'game_id': game_id, 'scenario_name': scenario_name, 'scope': scope})
+
+
 async def parse_character_list(ctx, characters):
     character_split = characters.split(',')
     character_list = []
@@ -37,8 +58,9 @@ async def parse_character_list(ctx, characters):
 
 
 def characters_in_scenario_table(game_id, scenario_name):
-    game_character = db.get_table('game_character', indicators={'game_id': game_id, 'scenario_name': scenario_name},
-                                  joins={'character': 'character_id'})
+    # todo include weighting
+    game_character = db.select_table('game_character', indicators={'game_id': game_id, 'scenario_name': scenario_name},
+                                     joins={'character': 'character_id'})
     game_character = game_character.sort_values('character_name')
 
     # groups characters into quantities rather than indvidual items
@@ -66,7 +88,7 @@ async def character_add(ctx, characters, scenario_name):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        character_data = db.get_table('character')
+        character_data = db.select_table('character')
         character_list = await parse_character_list(ctx, characters)
         for character in character_list:
 
@@ -95,9 +117,9 @@ async def character_remove(ctx, characters, scenario_name):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        game_character_data = db.get_table('game_character',
-                                           indicators={'game_id': game_id, 'scenario_name': scenario_name},
-                                           joins={'character': 'character_id'})
+        game_character_data = db.select_table('game_character',
+                                              indicators={'game_id': game_id, 'scenario_name': scenario_name},
+                                              joins={'character': 'character_id'})
         character_list = await parse_character_list(ctx, characters)
 
         game_character_ids_remove = []
@@ -119,11 +141,13 @@ async def character_remove(ctx, characters, scenario_name):
 
 
 async def scenarios_available(ctx):
+    #todo include weighting
     game_data = await game.get_game(ctx.channel, game_status.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        scenarios = db.get_table('game_character', indicators={'game_id': game_id}, joins={'character': 'character_id'})
+        scenarios = db.select_table('game_character', indicators={'game_id': game_id},
+                                    joins={'character': 'character_id'})
         scenarios = scenarios.groupby('scenario_name').count().reset_index()[['scenario_name', 'game_character_id']]
 
         table = Texttable()

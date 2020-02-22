@@ -19,7 +19,7 @@ from globals import game_status
 
 
 async def get_game(channel, check_status: game_status = None):
-    game_data = db.get_table('game', {'discord_category_id': channel.category.id})
+    game_data = db.select_table('game', {'discord_category_id': channel.category.id})
     if not game_data.empty:
         game_data = game_data.iloc[0]
 
@@ -90,13 +90,13 @@ async def create(ctx, game_name, starting_date):
                  'discord_announce_message_id': announcement_message.id}
     db.insert_into_table('game', game_data)
 
-    game_table = db.get_table('game', {'discord_category_id': game_category.id})
+    game_table = db.select_table('game', {'discord_category_id': game_category.id})
     game_id = game_table['game_id'].iloc[0]
 
     #####################
     ### CREATE ROLE #####
     #####################
-    role = db.get_table('role')
+    role = db.select_table('role')
     roles_created = {}
     for idx, row in role.iterrows():
         if row['default_value'] == 'everyone':
@@ -117,7 +117,7 @@ async def create(ctx, game_name, starting_date):
     ########################
     ### CREATE CHANNEL #####
     ########################
-    channels = db.get_table('channel')
+    channels = db.select_table('channel')
     for idx, channel in channels.iterrows():
         channel_options = {'name': channel['channel_name'],
                            'category': game_category,
@@ -151,14 +151,14 @@ async def remove(ctx, game_name):
 
     print(f'Removing game {category.name}')
 
-    game_data = db.get_table('game', {'discord_category_id': category.id}).iloc[0]
+    game_data = db.select_table('game', {'discord_category_id': category.id}).iloc[0]
     game_id = game_data['game_id']
 
     for ch in category.channels:
         await ch.delete()
     await category.delete()
 
-    game_role = db.get_table('game_role', {'game_id': game_id})
+    game_role = db.select_table('game_role', {'game_id': game_id})
     for idx, row in game_role.iterrows():
         role = guild.get_role(row['discord_role_id'])
         await role.delete()
@@ -168,9 +168,9 @@ async def remove(ctx, game_name):
 
 async def update_game_permissions(ctx, game_id, phase):
     # player permissions
-    # game_players = db.get_table('game_player', {'game_id': game_id})
-    character_permissions = db.get_table('character_permission', joins={'game_player': 'character_id'},
-                                         indicators={'game_id': game_id})
+    # game_players = db.select_table('game_player', {'game_id': game_id})
+    character_permissions = db.select_table('character_permission', joins={'game_player': 'character_id'},
+                                            indicators={'game_id': game_id})
 
     character_permissions = character_permissions[character_permissions['game_phase'].isin([None, phase])]
     # only keep permissions that track living status
@@ -178,10 +178,11 @@ async def update_game_permissions(ctx, game_id, phase):
     character_permissions = character_permissions[character_map]
 
     # role permissions
-    role_permissions = db.get_table('role_permission', joins={'game_role': 'role_id'}, indicators={'game_id': game_id})
+    role_permissions = db.select_table('role_permission', joins={'game_role': 'role_id'},
+                                       indicators={'game_id': game_id})
     role_permissions = role_permissions[role_permissions['game_phase'].isin([None, phase])]
 
-    for idx, channel_row in db.get_table('game_channel', {'game_id': game_id}).iterrows():
+    for idx, channel_row in db.select_table('game_channel', {'game_id': game_id}).iterrows():
         channel_id = channel_row['channel_id']
         channel = ctx.guild.get_channel(channel_row['discord_channel_id'])
 
@@ -218,7 +219,7 @@ async def update_game_permissions(ctx, game_id, phase):
 
 
 def get_game_player_status(ctx, game_id):
-    game_players = db.get_table('game_player', {'game_id': game_id})
+    game_players = db.select_table('game_player', {'game_id': game_id})
     print(game_players.dtypes)
     game_players = game_players.sort_values('position')
     guild = ctx.guild
@@ -239,9 +240,9 @@ async def game_assign_characters(ctx, scenario):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        game_players = db.get_table('game_player', indicators={'game_id': game_id})
-        game_characters = db.get_table('game_character',
-                                       indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
+        game_players = db.select_table('game_player', indicators={'game_id': game_id})
+        game_characters = db.select_table('game_character',
+                                          indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
             frac=1)
 
         correct_chars = await game_has_correct_chars(ctx, game_id, scenario)
@@ -257,7 +258,7 @@ async def game_assign_characters(ctx, scenario):
         for idx, player in game_players.iterrows():
             user = ctx.guild.get_member(player['discord_user_id'])
             character_id = game_characters['character_id'].iloc[idx]
-            character = db.get_table('character', indicators={'character_id': character_id}).iloc[0]
+            character = db.select_table('character', indicators={'character_id': character_id}).iloc[0]
 
             table.add_row([user, character["character_display_name"]])
 
@@ -266,7 +267,7 @@ async def game_assign_characters(ctx, scenario):
                                             'current_affiliation': character['starting_affiliation']},
                             {'game_id': game_id, 'discord_user_id': player['discord_user_id']})
 
-            # game_players = db.get_table('game_player', indicators={'game_id': game_id})
+            # game_players = db.select_table('game_player', indicators={'game_id': game_id})
 
         await ctx.channel.send(f'```{table.draw()}```')
         await update_game_permissions(ctx, game_id, 'day')
@@ -274,8 +275,9 @@ async def game_assign_characters(ctx, scenario):
 
 
 async def game_has_correct_chars(ctx, game_id, scenario) -> bool:
-    game_players = db.get_table('game_player', indicators={'game_id': game_id})
-    game_characters = db.get_table('game_character', indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
+    game_players = db.select_table('game_player', indicators={'game_id': game_id})
+    game_characters = db.select_table('game_character',
+                                      indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
         frac=1)
     if game_players.shape[0] != game_characters.shape[0] or game_players.shape[0] <= 0:
         await ctx.channel.send(
@@ -339,7 +341,7 @@ async def start(ctx, scenario):
         status_post = get_game_player_status(ctx, game_id)
         await ctx.channel.send(f'{status_post}')  # todo send this to the "player" channel
 
-        num_of_players = db.get_table('game_player', indicators={'game_id': game_id}).shape[0]
+        num_of_players = db.select_table('game_player', indicators={'game_id': game_id}).shape[0]
 
         db.update_table('game', {'status': game_status.ACTIVE.value, 'number_of_players': num_of_players},
                         {'game_id': game_id})

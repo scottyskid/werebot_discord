@@ -86,6 +86,13 @@ class Scenario(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.command(name='scenario-create',
+                      help='Creates a new scenario')
+    @commands.has_role('Admin')
+    async def scenario_create(self, ctx, scenario_name='primary',
+                              scope='local'):  # todo remove scenario_name default when finished testing
+        return await scenario.create(ctx, scenario_name, scope)
+
     @commands.command(name='character-add',
                       help='Add a character to scenario, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
     @commands.has_role('Admin')
@@ -131,16 +138,16 @@ async def on_raw_reaction_add(payload):
         return
     channel = bot.get_channel(payload.channel_id)
     if str(channel) == 'game-announcements':
-        game_table = db.get_table('game', {'status': game_status.RECRUITING.value})
+        game_table = db.select_table('game', {'status': game_status.RECRUITING.value})
         # game_table = game_table[game_table['status'].str.lower() == ]
 
         guild = bot.get_guild(payload.guild_id)
 
         for idx, row in game_table.iterrows():
-            if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
-
-                role_id = db.get_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
-                                       joins={'role': 'role_id'}).iloc[0]['discord_role_id']
+            if payload.message_id == row[
+                'discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
+                role_id = db.select_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
+                                          joins={'role': 'role_id'}).iloc[0]['discord_role_id']
                 role = guild.get_role(role_id)
 
                 member = guild.get_member(payload.user_id)
@@ -148,7 +155,7 @@ async def on_raw_reaction_add(payload):
 
                 # add member to database
                 game_player_data = {'game_id': row['game_id'],
-                             'discord_user_id': member.id}
+                                    'discord_user_id': member.id}
                 db.insert_into_table('game_player', game_player_data)
 
                 return
@@ -156,16 +163,17 @@ async def on_raw_reaction_add(payload):
 
 @bot.event
 async def on_raw_reaction_remove(payload):
-    game_table = db.get_table('game', {'status': game_status.RECRUITING.value})
+    game_table = db.select_table('game', {'status': game_status.RECRUITING.value})
 
     channel = bot.get_channel(payload.channel_id)
     if str(channel) == 'game-announcements':
 
         guild = bot.get_guild(payload.guild_id)
         for idx, row in game_table.iterrows():
-            if payload.message_id == row['discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
-                role_id = db.get_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
-                                       joins={'role': 'role_id'}).iloc[0]['discord_role_id']
+            if payload.message_id == row[
+                'discord_announce_message_id'] and payload.emoji.name == globals.GAME_REACTION_EMOJI:
+                role_id = db.select_table('game_role', {'game_id': row['game_id'], 'default_value': 'alive'},
+                                          joins={'role': 'role_id'}).iloc[0]['discord_role_id']
                 role = guild.get_role(role_id)
 
                 member = guild.get_member(payload.user_id)

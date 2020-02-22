@@ -24,7 +24,8 @@ async def death(ctx, player):
             await ctx.channel.send(f'There is no member called "{player}"')
             return
 
-        member_data = db.get_table("game_player", indicators={'game_id': game_id, 'discord_user_id': found_member.id})
+        member_data = db.select_table("game_player",
+                                      indicators={'game_id': game_id, 'discord_user_id': found_member.id})
         if member_data.empty:
             await ctx.channel.send(f'"{player}" is not a part of this game')
             return
@@ -34,7 +35,7 @@ async def death(ctx, player):
         db.update_table("game_player", data_to_update={'vitals': 'deceased'},
                         update_conditions={'game_id': game_id, 'discord_user_id': found_member.id})
 
-        role_data = db.get_table('game_role', joins={'role': 'role_id'}, indicators={'game_id': game_id})
+        role_data = db.select_table('game_role', joins={'role': 'role_id'}, indicators={'game_id': game_id})
         deceased_role_id = ctx.guild.get_role(
             role_data[role_data['default_value'] == 'deceased'].iloc[0]['discord_role_id'])
         alive_role_id = ctx.guild.get_role(role_data[role_data['default_value'] == 'alive'].iloc[0]['discord_role_id'])

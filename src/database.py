@@ -77,6 +77,16 @@ def create_database_tables():
                                     ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                 )''')
+            # create table SCENARIO
+            cursor.execute('''CREATE TABLE IF NOT EXISTS scenario(
+                                    scenario_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                    ,game_id INTEGER
+                                    ,scenario_name TEXT
+                                    ,scope TEXT
+                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                    ,FOREIGN KEY(game_id) REFERENCES game(game_id)
+                                )''')
             # create table ROLE_PERMISSION
             cursor.execute('''CREATE TABLE IF NOT EXISTS role_permission (
                                    role_permission_id INTEGER PRIMARY KEY AUTOINCREMENT
@@ -121,7 +131,8 @@ def create_database_tables():
                                     ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_player_id) REFERENCES game_player(game_player_id)
                                 )''')
-            # create table GAME_CHARACTER
+            # DEPRECIATED create table GAME_CHARACTER
+            # todo remove when scenario_character fully intergrated
             cursor.execute('''CREATE TABLE IF NOT EXISTS game_character (
                                    game_character_id INTEGER PRIMARY KEY AUTOINCREMENT
                                    ,game_id INTEGER NOT NULL
@@ -131,6 +142,17 @@ def create_database_tables():
                                    ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                    ,FOREIGN KEY(game_id) REFERENCES game(game_id)
+                                   ,FOREIGN KEY(character_id) REFERENCES character(character_id)
+                               )''')
+            # create table SCENARIO_CHARACTER
+            cursor.execute('''CREATE TABLE IF NOT EXISTS scenario_character (
+                                   scenario_character_id INTEGER PRIMARY KEY AUTOINCREMENT
+                                   ,scenario_id INTEGER NOT NULL
+                                   ,character_id INTEGER NOT NULL
+                                   ,requirement BOOLEAN DEFAULT True
+                                   ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                   ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
+                                   ,FOREIGN KEY(scenario_id) REFERENCES scenario(scenario_id)
                                    ,FOREIGN KEY(character_id) REFERENCES character(character_id)
                                )''')
             # create table GAME_EVENT
@@ -244,7 +266,7 @@ def game_insert(discord_category_id, game_name, start_date=None, end_date=None, 
     insert_into_table('game', locals())
 
 
-def get_table(table:str, indicators:dict=None, joins:dict=None):
+def select_table(table: str, indicators: dict = None, joins: dict = None):
     query = f'SELECT * from {table}'
     if joins is not None:
         for key, value in joins.items():
