@@ -47,8 +47,8 @@ class Game(commands.Cog):
 
     @commands.command(name='game-remove', help='WANING: Removes the entire game from the server (unrecoverable)')
     @commands.has_role('Admin')
-    async def game_remove(self, ctx, game_name='wolf'):
-        return await game.remove(ctx, game_name)
+    async def game_remove(self, ctx):
+        return await game.remove(ctx)
 
     @commands.command(name='game-info', help="prints info about the current game")
     @commands.has_role('Admin')

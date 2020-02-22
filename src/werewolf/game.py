@@ -24,7 +24,8 @@ async def get_game(channel, check_status: game_status = None):
         game_data = game_data.iloc[0]
 
         if check_status is not None and game_data['status'].lower() != check_status.value:
-            await channel.send(f'{game_data["game_name"]} is not in the {check_status} stage, this will have no affect')
+            await channel.send(
+                f'{game_data["game_name"]} is not in the {check_status.value} stage, this will have no affect')
             return None
         return game_data
     return None
@@ -139,31 +140,23 @@ async def create(ctx, game_name, starting_date):
     await update_game_permissions(ctx, game_id, 'day')
 
 
-async def remove(ctx, game_name):
-    # todo only allow to be done inside the moderator channel of a game
-    game_name = game_name.upper()
+async def remove(ctx):
     guild = ctx.guild
-    category = discord.utils.get(guild.categories, name=game_name)
+    category = ctx.channel.category
+    game_data = await get_game(ctx.channel)
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+        game_id = game_data['game_id']
 
-    if category is None:
-        await ctx.message.channel.send(f'{game_name} game does not exist')
-        return None
+        for ch in category.channels:
+            await ch.delete()
+        await category.delete()
 
-    print(f'Removing game {category.name}')
+        game_role = db.select_table('game_role', {'game_id': game_id})
+        for idx, row in game_role.iterrows():
+            role = guild.get_role(row['discord_role_id'])
+            await role.delete()
 
-    game_data = db.select_table('game', {'discord_category_id': category.id}).iloc[0]
-    game_id = game_data['game_id']
-
-    for ch in category.channels:
-        await ch.delete()
-    await category.delete()
-
-    game_role = db.select_table('game_role', {'game_id': game_id})
-    for idx, row in game_role.iterrows():
-        role = guild.get_role(row['discord_role_id'])
-        await role.delete()
-
-    db.update_table('game', {'status': game_status.REMOVED.value}, {'game_id': game_id})
+        db.update_table('game', {'status': game_status.REMOVED.value}, {'game_id': game_id})
 
 
 async def update_game_permissions(ctx, game_id, phase):
