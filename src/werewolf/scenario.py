@@ -37,23 +37,28 @@ async def parse_character_list(ctx, characters):
 
 
 def draw_scenario_characters_table(scenario_id):
-    # todo include weighting
     scenario_character = db.select_table('scenario_character', indicators={'scenario_id': scenario_id},
                                          joins={'character': 'character_id'})
     scenario_character = scenario_character.sort_values('character_name')
 
     # groups characters into quantities rather than indvidual items
-    characters = defaultdict(int)
+    characters = defaultdict(lambda: defaultdict(int))
     for idx, character in scenario_character.iterrows():
-        characters[character['character_name']] += 1
+        characters[character['character_name']]['count'] += 1
+        characters[character['character_name']]['weighting'] += character['weighting']
 
     table = Texttable()
-    table.header(['Character', 'Quantity'])
+    table.header(['Character', 'Quantity', 'Weighting'])
+
+    total_count = 0
+    total_weight = 0
 
     for key, value in characters.items():
-        table.add_row([key, value])
+        table.add_row([key, value['count'], value['weighting']])
+        total_count += value['count']
+        total_weight += value['weighting']
 
-    table.add_row(['TOTAL', scenario_character.shape[0]])
+    table.add_row(['TOTAL', total_count, total_weight])
 
     return table
 
@@ -120,15 +125,19 @@ async def list(ctx):
         await ctx.channel.send(f'not allowed on this channel')
         return
 
-    scenario_data = db.select_table('scenario')
+    scenario_data = db.select_table('scenario',
+                                    joins={'scenario_character': 'scenario_id', 'character': 'character_id'})
     scenario_data = scenario_data[scenario_data['game_id'].isin([game_id, None])]
-    # todo add in number of characters and weighting in this list
+    scenario_data['count'] = 1
+
+    scenario_data = scenario_data.groupby(['scenario_id', 'scenario_name', 'scope']).sum()[
+        ['count', 'weighting']].reset_index()
 
     table = Texttable()
-    table.header(['ID', 'Name', 'Scope'])
+    table.header(['ID', 'Name', 'Scope', 'Characters', 'Weighting'])
 
     for idx, row in scenario_data.iterrows():
-        table.add_row([row['scenario_id'], row['scenario_name'], row['scope']])
+        table.add_row([row['scenario_id'], row['scenario_name'], row['scope'], row['count'], row['weighting']])
 
     await ctx.channel.send(f'```{table.draw()}```')
 
