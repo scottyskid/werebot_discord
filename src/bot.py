@@ -24,101 +24,104 @@ from werewolf import game, event, scenario
 
 bot = commands.Bot(command_prefix='!')
 
+def setup(bot):
+    bot.add_cog(Game(bot))
+    bot.add_cog(Scenario(bot))
+    bot.add_cog(Event(bot))
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
 
 
-@bot.command(name='game-create', help='Create a game and its associated Category, channels, roles and permissions')
-@commands.has_role('Admin')
-async def game_create(ctx, game_name='WOLF', starting_date=(date.today() + timedelta(days=1)).strftime("%y-%m-%d")):
-    return await game.create(ctx, game_name, starting_date)
+class Game(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(name='game-create',
+                      help='Create a game and its associated Category, channels, roles and permissions')
+    @commands.has_role('Admin')
+    async def game_create(self, ctx, game_name='WOLF',
+                          starting_date=(date.today() + timedelta(days=1)).strftime("%y-%m-%d")):
+        return await game.create(ctx, game_name, starting_date)
+
+    @commands.command(name='game-remove', help='WANING: Removes the entire game from the server (unrecoverable)')
+    @commands.has_role('Admin')
+    async def game_remove(self, ctx, game_name='wolf'):
+        return await game.remove(ctx, game_name)
+
+    @commands.command(name='game-info', help="prints info about the current game")
+    @commands.has_role('Admin')
+    async def game_info(self, ctx):
+        return await game.info(ctx)
+
+    @commands.command(name='game-start', help="starts the game, assigns and updates permsissions")
+    @commands.has_role('Admin')
+    async def game_start(self, ctx, build='primary'):
+        return await game.start(ctx, build)
+
+    @commands.command(name='game-complete', help="completes a game")
+    @commands.has_role('Admin')
+    async def game_complete(self, ctx):
+        return await game.complete(ctx)
+
+    @commands.command(name='game-player-status', help="prints out the current state of all players")
+    @commands.has_role('Admin')
+    async def game_player_status(self, ctx):
+        return await game.player_status(ctx)
+
+    @commands.command(name='game-phase-set', help="change the game phase, values accepted [day, night]")
+    @commands.has_role('Admin')
+    async def game_phase_set(self, ctx, phase):
+        return await game.phase_set(ctx, phase)
+
+    @commands.command(name='game-assign-characters',
+                      help='Deprechiated. Randomly assigns the characters of a build to characters')
+    @commands.has_role('Admin')
+    async def game_assign_characters(self, ctx, build='primary'):
+        return await game.game_assign_characters(ctx, build)
 
 
-@bot.command(name='game-remove', help='WANING: Removes the entire game from the server (unrecoverable)')
-@commands.has_role('Admin')
-async def game_remove(ctx, game_name='wolf'):
-    return await game.remove(ctx, game_name)
+class Scenario(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(name='character-add',
+                      help='Add a character to build, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
+    @commands.has_role('Admin')
+    async def character_add(self, ctx, characters, build='primary'):
+        return await scenario.character_add(ctx, characters, build)
+
+    @commands.command(name='character-remove',
+                      help='Remove a character from a build, characters can be provieded in the same manner as character-add')
+    @commands.has_role('Admin')
+    async def character_remove(self, ctx, characters, build='primary'):
+        return await scenario.character_remove(ctx, characters, build)
+
+    @commands.command(name='builds-available', help='List all available builds to this game')
+    @commands.has_role('Admin')
+    async def builds_available(self, ctx):
+        return await scenario.builds_available(ctx)
+
+    @commands.command(name='character-build-list', help='List all characters in selected build')
+    @commands.has_role('Admin')
+    async def character_list(self, ctx, build='primary'):
+        return await scenario.character_list(ctx, build)
+
+    @commands.command(name='character-build-purge', help='Removes all characters in selected build')
+    @commands.has_role('Admin')
+    async def character_build_purge(self, ctx, build='primary'):
+        return await scenario.character_build_purge(ctx, build)
 
 
-@bot.command(name='game-info', help="prints info about the current game")
-@commands.has_role('Admin')
-async def game_info(ctx):
-    return await game.info(ctx)
+class Event(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-
-@bot.command(name='game-start', help="starts the game, assigns and updates permsissions")
-@commands.has_role('Admin')
-async def game_start(ctx, build='primary'):
-    return await game.start(ctx, build)
-
-
-@bot.command(name='game-complete', help="completes a game")
-@commands.has_role('Admin')
-async def game_complete(ctx):
-    return await game.complete(ctx)
-
-
-@bot.command(name='game-player-status', help="prints out the current state of all players")
-@commands.has_role('Admin')
-async def game_player_status(ctx):
-    return await game.player_status(ctx)
-
-
-@bot.command(name='game-phase-set', help="change the game phase, values accepted [day, night]")
-@commands.has_role('Admin')
-async def game_phase_set(ctx, phase):
-    return await game.phase_set(ctx, phase)
-
-
-@bot.command(name='game-assign-characters',
-             help='Deprechiated. Randomly assigns the characters of a build to characters')
-@commands.has_role('Admin')
-async def game_assign_characters(ctx, build='primary'):
-    return await game.game_assign_characters(ctx, build)
-
-
-
-
-
-@bot.command(name='character-add', help='Add a character to build, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
-@commands.has_role('Admin')
-async def character_add(ctx, characters, build='primary'):
-    return await scenario.character_add(ctx, characters, build)
-
-
-@bot.command(name='character-remove',
-             help='Remove a character from a build, characters can be provieded in the same manner as character-add')
-@commands.has_role('Admin')
-async def character_remove(ctx, characters, build='primary'):
-    return await scenario.character_remove(ctx, characters, build)
-
-
-@bot.command(name='builds-available', help='List all available builds to this game')
-@commands.has_role('Admin')
-async def builds_available(ctx):
-    return await scenario.builds_available(ctx)
-
-
-@bot.command(name='character-build-list', help='List all characters in selected build')
-@commands.has_role('Admin')
-async def character_list(ctx, build='primary'):
-    return await scenario.character_list(ctx, build)
-
-
-@bot.command(name='character-build-purge', help='Removes all characters in selected build')
-@commands.has_role('Admin')
-async def character_build_purge(ctx, build='primary'):
-    return await scenario.character_build_purge(ctx, build)
-
-
-
-
-@bot.command(name='death', help='provide a characters name and tag to kill in the form of "player#0000"')
-@commands.has_role('Admin')
-async def death(ctx, player):
-    return await event.death(ctx, player)
+    @commands.command(name='death', help='provide a characters name and tag to kill in the form of "player#0000"')
+    @commands.has_role('Admin')
+    async def death(self, ctx, player):
+        return await event.death(ctx, player)
 
 
 #todo make these into one function
