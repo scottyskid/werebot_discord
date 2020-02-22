@@ -131,19 +131,6 @@ def create_database_tables():
                                     ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
                                     ,FOREIGN KEY(game_player_id) REFERENCES game_player(game_player_id)
                                 )''')
-            # DEPRECIATED create table GAME_CHARACTER
-            # todo remove when scenario_character fully intergrated
-            cursor.execute('''CREATE TABLE IF NOT EXISTS game_character (
-                                   game_character_id INTEGER PRIMARY KEY AUTOINCREMENT
-                                   ,game_id INTEGER NOT NULL
-                                   ,character_id INTEGER NOT NULL
-                                   ,scenario_name TEXT
-                                   ,will_play BOOLEAN DEFAULT True
-                                   ,created_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
-                                   ,modified_datetime DATETIME DEFAULT (datetime('now', 'localtime'))
-                                   ,FOREIGN KEY(game_id) REFERENCES game(game_id)
-                                   ,FOREIGN KEY(character_id) REFERENCES character(character_id)
-                               )''')
             # create table SCENARIO_CHARACTER
             cursor.execute('''CREATE TABLE IF NOT EXISTS scenario_character (
                                    scenario_character_id INTEGER PRIMARY KEY AUTOINCREMENT

@@ -86,39 +86,38 @@ class Scenario(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name='scenario-create',
-                      help='Creates a new scenario')
+    @commands.command(name='scenario-create', help='Creates a new scenario')
     @commands.has_role('Admin')
     async def scenario_create(self, ctx, scenario_name='primary',
                               scope='local'):  # todo remove scenario_name default when finished testing
         return await scenario.create(ctx, scenario_name, scope)
 
-    @commands.command(name='character-add',
+    @commands.command(name='scenario-list-available', help='List all available scenarios to this game')
+    @commands.has_role('Admin')
+    async def scenario_list(self, ctx):
+        return await scenario.list(ctx)
+
+    @commands.command(name='scenario-character-add',
                       help='Add a character to scenario, lower case comma seperated list of characters to add. Pass quantities after name seperated by pipe "|". NO SPACES. e.g. "werewolf|2,villager|4,seer"')
     @commands.has_role('Admin')
-    async def character_add(self, ctx, characters, scenario_name='primary'):
+    async def scenario_character_add(self, ctx, characters, scenario_name='primary'):
         return await scenario.character_add(ctx, characters, scenario_name)
 
-    @commands.command(name='character-remove',
+    @commands.command(name='scenario-character-remove',
                       help='Remove a character from a scenario, characters can be provieded in the same manner as character-add')
     @commands.has_role('Admin')
     async def character_remove(self, ctx, characters, scenario_name='primary'):
         return await scenario.character_remove(ctx, characters, scenario_name)
 
-    @commands.command(name='scenarios-available', help='List all available scenarios to this game')
-    @commands.has_role('Admin')
-    async def scenarios_available(self, ctx):
-        return await scenario.scenarios_available(ctx)
-
-    @commands.command(name='character-scenario-list', help='List all characters in selected scenario')
+    @commands.command(name='scenario-character-list', help='List all characters in selected scenario')
     @commands.has_role('Admin')
     async def character_list(self, ctx, scenario_name='primary'):
         return await scenario.character_list(ctx, scenario_name)
 
-    @commands.command(name='character-scenario-purge', help='Removes all characters in selected scenario')
+    @commands.command(name='scenario-purge', help='Removes all characters in selected scenario')
     @commands.has_role('Admin')
     async def character_scenario_purge(self, ctx, scenario_name='primary'):
-        return await scenario.character_scenario_purge(ctx, scenario_name)
+        return await scenario.purge(ctx, scenario_name)
 
 
 class Event(commands.Cog):
