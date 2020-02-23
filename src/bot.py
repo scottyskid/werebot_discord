@@ -5,17 +5,11 @@ not much work is done in this file, it is mostly designed as a switching board
 to point events and commands to certain logic
 """
 
-from collections import defaultdict
 from datetime import date, timedelta
-from dateutil.parser import parse
 import logging
-import random
 
 import discord
 from discord.ext import commands
-import numpy as np
-import pandas as pd
-from texttable import Texttable
 
 import database as db
 import globals
@@ -162,6 +156,8 @@ async def on_raw_reaction_add(payload):
                                     'discord_user_id': member.id}
                 db.insert_into_table('game_player', game_player_data)
 
+                await game.update_announcement_message(channel, row['game_id'])
+
                 return
 
 
@@ -184,6 +180,8 @@ async def on_raw_reaction_remove(payload):
                 await member.remove_roles(role)
 
                 db.delete_from_table('game_player', {'game_id': row['game_id'], 'discord_user_id': member.id})
+
+                await game.update_announcement_message(channel, row['game_id'])
 
                 return
 

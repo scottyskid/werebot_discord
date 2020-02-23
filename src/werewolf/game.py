@@ -32,6 +32,41 @@ async def get_game(channel, check_status: GameStatus = None):
     return None
 
 
+def generate_announcement_message(game_id):
+    game_table = db.select_table('game', {'game_id': game_id}).iloc[0]
+    game_player_table = db.select_table('game_player', indicators={'game_id': game_id})
+
+    announcement_table = Texttable()
+    announcement_table.header(['Codename', 'Starting Date', 'Emoji', 'Status', 'Current Players'])
+    announcement_table.add_row(
+        [game_table['game_name'], game_table['start_date'], globals.GAME_REACTION_EMOJI, game_table['status'],
+         game_player_table.shape[0]])
+
+    if GameStatus(game_table['status']) in [GameStatus.ACTIVE, GameStatus.COMPLETED]:
+        message = f'This game has now closed' \
+                  f"```{announcement_table.draw()}```"
+    else:
+        message = f"New game called {game_table['game_name']} will be starting on {game_table['start_date']}. " \
+                  f"If you would like to register for this game, react to this post with a {globals.GAME_REACTION_EMOJI} " \
+                  f"Registrations will close at 5pm on {game_table['start_date']}. Roles will be assigned and more instructions will follow.\n" \
+                  f"```{announcement_table.draw()}```"
+
+    return message
+
+
+async def update_announcement_message(game_id, ctx=None, channel=None):
+    if ctx is not None:
+        for cur_channel in ctx.guild.channels:
+            if cur_channel.name == 'game-announcements':
+                channel = cur_channel
+
+    game_table = db.select_table('game', {'game_id': game_id}).iloc[0]
+
+    message = await channel.fetch_message(game_table['discord_announce_message_id'])
+    text = generate_announcement_message(game_id)
+    await message.edit(content=text)
+
+
 async def create(ctx, game_name, starting_date):
     game_name = game_name.upper()
 
@@ -79,21 +114,25 @@ async def create(ctx, game_name, starting_date):
     default_permissions = {guild.default_role: discord.PermissionOverwrite(read_messages=False)}
     game_category = await guild.create_category(game_name, overwrites=default_permissions)
 
-    # send an announcemnt for the game
-    announcement_message = await announcement_channel.send(
-        f'''New game called {game_name} will be starting on {starting_date}. If you would like to register for this game, react to this post with a {globals.GAME_REACTION_EMOJI} Registrations will close at 5pm on {starting_date}. Roles will be assigned and more instructions will follow.''')
-    await announcement_message.add_reaction(globals.GAME_REACTION_EMOJI)
-
     # add game data to database
     game_data = {'discord_category_id': game_category.id,
                  'game_name': game_name,
                  'status': GameStatus.CREATING.value,
-                 'start_date': starting_date,
-                 'discord_announce_message_id': announcement_message.id}
+                 'start_date': starting_date}
     db.insert_into_table('game', game_data)
 
     game_table = db.select_table('game', {'discord_category_id': game_category.id})
     game_id = game_table['game_id'].iloc[0]
+
+    #######################
+    ### ANNOUNCE GAME #####
+    #######################
+
+    # send an announcemnt for the game
+    message = generate_announcement_message(game_id)
+    announcement_message = await announcement_channel.send(message)
+    await announcement_message.add_reaction(globals.GAME_REACTION_EMOJI)
+    db.update_table('game', {'discord_announce_message_id': announcement_message.id}, {'game_id': game_id})
 
     #####################
     ### CREATE ROLE #####
@@ -216,6 +255,7 @@ async def update_game_permissions(ctx, game_id, phase: str, status: GameStatus):
     db.update_table('game', data_to_update={'phase': phase}, update_conditions={'game_id': game_id})
 
 
+
 def get_game_player_status(ctx, game_id):
     game_players = db.select_table('game_player', {'game_id': game_id})
     game_players = game_players.sort_values('position')
@@ -293,7 +333,6 @@ async def phase_set(ctx, phase):
         await update_game_permissions(ctx, game_id, phase, GameStatus.ACTIVE)
 
     # todo post when complete (maybe do that in update_permissions
-    # todo split into functions for phase-day
 
 
 async def info(ctx):
@@ -313,12 +352,13 @@ async def info(ctx):
 
 
 async def player_status(ctx):
-    game_data = await get_game(ctx.channel)  # todo set to only "active" after testing
+    game_data = await get_game(ctx.channel)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         status_post = get_game_player_status(ctx, game_id)
         await ctx.channel.send(f'{status_post}')
+
 
 
 async def start(ctx, scenario_name):
@@ -336,8 +376,7 @@ async def start(ctx, scenario_name):
         if not correct_chars:
             return
 
-        db.update_table('game', {'status': GameStatus.INITIALIZING.value},
-                        {'game_id': game_id})  # todo add number of players
+        db.update_table('game', {'status': GameStatus.INITIALIZING.value}, {'game_id': game_id})
 
         await game_assign_characters(ctx, scenario_id)
         await update_game_permissions(ctx, game_id, 'day', GameStatus.ACTIVE)
@@ -352,6 +391,8 @@ async def start(ctx, scenario_name):
 
         db.update_table('game', {'status': GameStatus.ACTIVE.value, 'number_of_players': num_of_players},
                         {'game_id': game_id})
+
+        await update_announcement_message(game_id, ctx=ctx)
 
 
 async def complete(ctx):
@@ -376,4 +417,5 @@ async def status_set(ctx, status):
 
         await update_game_permissions(ctx, game_id, 'day', game_status)
         db.update_table('game', {'status': game_status.value, 'end_date': date.today()}, {'game_id': game_id})
+        await update_announcement_message(game_id, ctx=ctx)
         await ctx.channel.send(f'changed status to {game_status.value}')

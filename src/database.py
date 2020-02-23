@@ -21,7 +21,7 @@ def create_database_tables():
             cursor.execute('''CREATE TABLE IF NOT EXISTS game(
                                     game_id INTEGER PRIMARY KEY AUTOINCREMENT
                                     ,discord_category_id INTEGER NOT NULL
-                                    ,discord_announce_message_id INTEGER NOT NULL
+                                    ,discord_announce_message_id INTEGER
                                     ,game_name TEXT
                                     ,start_date DATE
                                     ,end_date DATE

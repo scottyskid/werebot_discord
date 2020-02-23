@@ -24,8 +24,6 @@ class GameStatus(Enum):
 
 
 
-
-
 def setup_logging(default_path, default_level=logging.WARNING):
     """Setup logging configuration
 
