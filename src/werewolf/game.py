@@ -301,11 +301,13 @@ async def info(ctx):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
+        game_players = db.select_table('game_player', indicators={'game_id': game_id})
+
         table = Texttable()
-        table.header(['ID', 'Name', 'Status', 'Phase', 'Start Date', 'Players'])  # todo add in character if deceased
+        table.header(['ID', 'Name', 'Status', 'Phase', 'Start Date', 'Players'])
 
         table.add_row([game_data['game_id'], game_data['game_name'], game_data['status'], game_data['phase'],
-                       game_data['start_date'], game_data['number_of_players']])
+                       game_data['start_date'], game_players.shape[0]])
 
         await ctx.channel.send(f'```{table.draw()}```')
 
