@@ -128,6 +128,12 @@ class Event(commands.Cog):
     async def death(self, ctx, player):
         return await event.death(ctx, player)
 
+    @commands.command(name='resurrect',
+                      help='provide a characters name and tag to resurrect in the form of "player#0000"')
+    @commands.has_role('Admin')
+    async def resurrect(self, ctx, player):
+        return await event.resurrect(ctx, player)
+
 
 #todo make these into one function
 @bot.event

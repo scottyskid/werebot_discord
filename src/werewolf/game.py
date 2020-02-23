@@ -218,7 +218,6 @@ async def update_game_permissions(ctx, game_id, phase: str, status: GameStatus):
 
 def get_game_player_status(ctx, game_id):
     game_players = db.select_table('game_player', {'game_id': game_id})
-    print(game_players.dtypes)
     game_players = game_players.sort_values('position')
     guild = ctx.guild
 
@@ -343,7 +342,6 @@ async def start(ctx, scenario_name):
 
         status_post = get_game_player_status(ctx, game_id)
         for channel in ctx.channel.category.channels:
-            print(channel)
             if channel.name == 'player':
                 await channel.send(f'{status_post}')
                 break
