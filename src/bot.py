@@ -75,12 +75,6 @@ class Game(commands.Cog):
     async def game_phase_set(self, ctx, phase):
         return await game.phase_set(ctx, phase)
 
-    @commands.command(name='game-assign-characters',
-                      help='Deprechiated. Randomly assigns the characters of a scenario to characters')
-    @commands.has_role('Admin')
-    async def game_assign_characters(self, ctx, scenario='primary'):
-        return await game.game_assign_characters(ctx, scenario)
-
 
 class Scenario(commands.Cog):
     def __init__(self, bot):

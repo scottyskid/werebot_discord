@@ -16,6 +16,7 @@ from texttable import Texttable
 import database as db
 import globals
 from globals import game_status
+from werewolf import scenario
 
 
 async def get_game(channel, check_status: game_status = None):
@@ -137,7 +138,7 @@ async def create(ctx, game_name, starting_date):
     ### SET PERMISSIONS #####
     #########################
     db.update_table('game', {'status': game_status.RECRUITING.value}, {'game_id': game_id})
-    await update_game_permissions(ctx, game_id, 'day')
+    await update_game_permissions(ctx, game_id, 'day', game_status.RECRUITING)
 
 
 async def remove(ctx):
@@ -159,13 +160,15 @@ async def remove(ctx):
         db.update_table('game', {'status': game_status.REMOVED.value}, {'game_id': game_id})
 
 
-async def update_game_permissions(ctx, game_id, phase):
+async def update_game_permissions(ctx, game_id, phase: str, status: game_status):
     # player permissions
     # game_players = db.select_table('game_player', {'game_id': game_id})
     character_permissions = db.select_table('character_permission', joins={'game_player': 'character_id'},
                                             indicators={'game_id': game_id})
 
-    character_permissions = character_permissions[character_permissions['game_phase'].isin([None, phase])]
+    character_permissions = character_permissions[
+        character_permissions['game_phase'].isin([None, phase]) & character_permissions['game_status'].isin(
+            [None, status.value])]
     # only keep permissions that track living status
     character_map = character_permissions.apply(lambda x: x['vitals_required'] in [None, x['vitals']], axis=1)
     character_permissions = character_permissions[character_map]
@@ -173,7 +176,8 @@ async def update_game_permissions(ctx, game_id, phase):
     # role permissions
     role_permissions = db.select_table('role_permission', joins={'game_role': 'role_id'},
                                        indicators={'game_id': game_id})
-    role_permissions = role_permissions[role_permissions['game_phase'].isin([None, phase])]
+    role_permissions = role_permissions[
+        role_permissions['game_phase'].isin([None, phase]) & role_permissions['game_status'].isin([None, status.value])]
 
     for idx, channel_row in db.select_table('game_channel', {'game_id': game_id}).iterrows():
         channel_id = channel_row['channel_id']
@@ -208,6 +212,7 @@ async def update_game_permissions(ctx, game_id, phase):
         for target in old_targets:
             await channel.set_permissions(target, overwrite=discord.PermissionOverwrite())
 
+
     db.update_table('game', data_to_update={'phase': phase}, update_conditions={'game_id': game_id})
 
 
@@ -226,19 +231,18 @@ def get_game_player_status(ctx, game_id):
     return f'```{table.draw()}```'
 
 
-async def game_assign_characters(ctx, scenario):
-    scenario = scenario.lower()
+async def game_assign_characters(ctx, scenario_id):
+    # scenario = scenario.lower()
 
     game_data = await get_game(ctx.channel, game_status.INITIALIZING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
         game_players = db.select_table('game_player', indicators={'game_id': game_id})
-        game_characters = db.select_table('game_character',
-                                          indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
-            frac=1)
+        game_characters = db.select_table('scenario_character',
+                                          indicators={'scenario_id': scenario_id}).sample(frac=1)
 
-        correct_chars = await game_has_correct_chars(ctx, game_id, scenario)
+        correct_chars = await game_has_correct_chars(ctx, game_id, scenario_id)
         if not correct_chars:
             return
 
@@ -263,18 +267,18 @@ async def game_assign_characters(ctx, scenario):
             # game_players = db.select_table('game_player', indicators={'game_id': game_id})
 
         await ctx.channel.send(f'```{table.draw()}```')
-        await update_game_permissions(ctx, game_id, 'day')
+        await update_game_permissions(ctx, game_id, 'day', game_status.INITIALIZING)
         return
 
 
-async def game_has_correct_chars(ctx, game_id, scenario) -> bool:
+async def game_has_correct_chars(ctx, game_id, scenario_id) -> bool:
     game_players = db.select_table('game_player', indicators={'game_id': game_id})
-    game_characters = db.select_table('game_character',
-                                      indicators={'game_id': game_id, 'scenario_name': scenario}).sample(
+    scenario_characters = db.select_table('scenario_character',
+                                          indicators={'scenario_id': scenario_id}).sample(
         frac=1)
-    if game_players.shape[0] != game_characters.shape[0] or game_players.shape[0] <= 0:
+    if game_players.shape[0] != scenario_characters.shape[0] or game_players.shape[0] <= 0:
         await ctx.channel.send(
-            f'players ({game_players.shape[0]}) and characters ({game_characters.shape[0]}) must be equal')
+            f'players ({game_players.shape[0]}) and characters ({scenario_characters.shape[0]}) must be equal')
         return False
     return True
 
@@ -287,7 +291,7 @@ async def phase_set(ctx, phase):
             return
 
         game_id = game_data['game_id']
-        await update_game_permissions(ctx, game_id, phase)
+        await update_game_permissions(ctx, game_id, phase, game_status.ACTIVE)
 
     # todo post when complete (maybe do that in update_permissions
     # todo split into functions for phase-day
@@ -316,20 +320,26 @@ async def player_status(ctx):
         await ctx.channel.send(f'{status_post}')
 
 
-async def start(ctx, scenario):
+async def start(ctx, scenario_name):
     game_data = await get_game(ctx.channel, game_status.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        correct_chars = await game_has_correct_chars(ctx, game_id, scenario)
+        scenario_name = scenario_name.lower().replace(' ', '-')
+        scenario_data = await scenario.get_scenario_data(ctx, scenario_name)
+        if scenario_data is None:
+            return
+        scenario_id = scenario_data['scenario_id']
+
+        correct_chars = await game_has_correct_chars(ctx, game_id, scenario_id)
         if not correct_chars:
             return
 
         db.update_table('game', {'status': game_status.INITIALIZING.value},
                         {'game_id': game_id})  # todo add number of players
 
-        await game_assign_characters(ctx, scenario)
-        await update_game_permissions(ctx, game_id, 'day')
+        await game_assign_characters(ctx, scenario_id)
+        await update_game_permissions(ctx, game_id, 'day', game_status.ACTIVE.value)
 
         status_post = get_game_player_status(ctx, game_id)
         await ctx.channel.send(f'{status_post}')  # todo send this to the "player" channel
@@ -345,4 +355,5 @@ async def complete(ctx):
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
+        await update_game_permissions(ctx, game_id, 'day', game_status.COMPLETED.value)
         db.update_table('game', {'status': game_status.COMPLETED.value, 'end_date': date.today()}, {'game_id': game_id})
