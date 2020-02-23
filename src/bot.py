@@ -19,7 +19,7 @@ from texttable import Texttable
 
 import database as db
 import globals
-from globals import game_status
+from globals import GameStatus
 from werewolf import game, event, scenario
 
 bot = commands.Bot(command_prefix='!')
@@ -74,6 +74,11 @@ class Game(commands.Cog):
     @commands.has_role('Admin')
     async def game_phase_set(self, ctx, phase):
         return await game.phase_set(ctx, phase)
+
+    @commands.command(name='game-status-set', help="change the game status]")
+    @commands.has_role('Admin')
+    async def game_status_set(self, ctx, status):
+        return await game.status_set(ctx, status)
 
 
 class Scenario(commands.Cog):
@@ -131,7 +136,7 @@ async def on_raw_reaction_add(payload):
         return
     channel = bot.get_channel(payload.channel_id)
     if str(channel) == 'game-announcements':
-        game_table = db.select_table('game', {'status': game_status.RECRUITING.value})
+        game_table = db.select_table('game', {'status': GameStatus.RECRUITING.value})
         # game_table = game_table[game_table['status'].str.lower() == ]
 
         guild = bot.get_guild(payload.guild_id)
@@ -156,7 +161,7 @@ async def on_raw_reaction_add(payload):
 
 @bot.event
 async def on_raw_reaction_remove(payload):
-    game_table = db.select_table('game', {'status': game_status.RECRUITING.value})
+    game_table = db.select_table('game', {'status': GameStatus.RECRUITING.value})
 
     channel = bot.get_channel(payload.channel_id)
     if str(channel) == 'game-announcements':

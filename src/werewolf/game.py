@@ -15,11 +15,11 @@ from texttable import Texttable
 
 import database as db
 import globals
-from globals import game_status
+from globals import GameStatus
 from werewolf import scenario
 
 
-async def get_game(channel, check_status: game_status = None):
+async def get_game(channel, check_status: GameStatus = None):
     game_data = db.select_table('game', {'discord_category_id': channel.category.id})
     if not game_data.empty:
         game_data = game_data.iloc[0]
@@ -87,7 +87,7 @@ async def create(ctx, game_name, starting_date):
     # add game data to database
     game_data = {'discord_category_id': game_category.id,
                  'game_name': game_name,
-                 'status': game_status.CREATING.value,
+                 'status': GameStatus.CREATING.value,
                  'start_date': starting_date,
                  'discord_announce_message_id': announcement_message.id}
     db.insert_into_table('game', game_data)
@@ -137,8 +137,8 @@ async def create(ctx, game_name, starting_date):
     #########################
     ### SET PERMISSIONS #####
     #########################
-    db.update_table('game', {'status': game_status.RECRUITING.value}, {'game_id': game_id})
-    await update_game_permissions(ctx, game_id, 'day', game_status.RECRUITING)
+    db.update_table('game', {'status': GameStatus.RECRUITING.value}, {'game_id': game_id})
+    await update_game_permissions(ctx, game_id, 'day', GameStatus.RECRUITING)
 
 
 async def remove(ctx):
@@ -157,10 +157,10 @@ async def remove(ctx):
             role = guild.get_role(row['discord_role_id'])
             await role.delete()
 
-        db.update_table('game', {'status': game_status.REMOVED.value}, {'game_id': game_id})
+        db.update_table('game', {'status': GameStatus.REMOVED.value}, {'game_id': game_id})
 
 
-async def update_game_permissions(ctx, game_id, phase: str, status: game_status):
+async def update_game_permissions(ctx, game_id, phase: str, status: GameStatus):
     # player permissions
     # game_players = db.select_table('game_player', {'game_id': game_id})
     character_permissions = db.select_table('character_permission', joins={'game_player': 'character_id'},
@@ -234,7 +234,7 @@ def get_game_player_status(ctx, game_id):
 async def game_assign_characters(ctx, scenario_id):
     # scenario = scenario.lower()
 
-    game_data = await get_game(ctx.channel, game_status.INITIALIZING)
+    game_data = await get_game(ctx.channel, GameStatus.INITIALIZING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
@@ -267,7 +267,7 @@ async def game_assign_characters(ctx, scenario_id):
             # game_players = db.select_table('game_player', indicators={'game_id': game_id})
 
         await ctx.channel.send(f'```{table.draw()}```')
-        await update_game_permissions(ctx, game_id, 'day', game_status.INITIALIZING)
+        await update_game_permissions(ctx, game_id, 'day', GameStatus.INITIALIZING)
         return
 
 
@@ -284,14 +284,14 @@ async def game_has_correct_chars(ctx, game_id, scenario_id) -> bool:
 
 
 async def phase_set(ctx, phase):
-    game_data = await get_game(ctx.channel, game_status.ACTIVE)
+    game_data = await get_game(ctx.channel, GameStatus.ACTIVE)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         if phase not in ['day', 'night']:
             await ctx.channel.send(f'not a valid phase')
             return
 
         game_id = game_data['game_id']
-        await update_game_permissions(ctx, game_id, phase, game_status.ACTIVE)
+        await update_game_permissions(ctx, game_id, phase, GameStatus.ACTIVE)
 
     # todo post when complete (maybe do that in update_permissions
     # todo split into functions for phase-day
@@ -321,7 +321,7 @@ async def player_status(ctx):
 
 
 async def start(ctx, scenario_name):
-    game_data = await get_game(ctx.channel, game_status.RECRUITING)
+    game_data = await get_game(ctx.channel, GameStatus.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
@@ -335,25 +335,45 @@ async def start(ctx, scenario_name):
         if not correct_chars:
             return
 
-        db.update_table('game', {'status': game_status.INITIALIZING.value},
+        db.update_table('game', {'status': GameStatus.INITIALIZING.value},
                         {'game_id': game_id})  # todo add number of players
 
         await game_assign_characters(ctx, scenario_id)
-        await update_game_permissions(ctx, game_id, 'day', game_status.ACTIVE.value)
+        await update_game_permissions(ctx, game_id, 'day', GameStatus.ACTIVE)
 
         status_post = get_game_player_status(ctx, game_id)
-        await ctx.channel.send(f'{status_post}')  # todo send this to the "player" channel
+        for channel in ctx.channel.category.channels:
+            print(channel)
+            if channel.name == 'player':
+                await channel.send(f'{status_post}')
+                break
 
         num_of_players = db.select_table('game_player', indicators={'game_id': game_id}).shape[0]
 
-        db.update_table('game', {'status': game_status.ACTIVE.value, 'number_of_players': num_of_players},
+        db.update_table('game', {'status': GameStatus.ACTIVE.value, 'number_of_players': num_of_players},
                         {'game_id': game_id})
 
 
 async def complete(ctx):
-    game_data = await get_game(ctx.channel, game_status.ACTIVE)
+    game_data = await get_game(ctx.channel, GameStatus.ACTIVE)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 
-        await update_game_permissions(ctx, game_id, 'day', game_status.COMPLETED.value)
-        db.update_table('game', {'status': game_status.COMPLETED.value, 'end_date': date.today()}, {'game_id': game_id})
+        await update_game_permissions(ctx, game_id, 'day', GameStatus.COMPLETED.value)
+        db.update_table('game', {'status': GameStatus.COMPLETED.value, 'end_date': date.today()}, {'game_id': game_id})
+
+
+async def status_set(ctx, status):
+    game_data = await get_game(ctx.channel)
+    if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
+        game_id = game_data['game_id']
+
+        try:
+            game_status = GameStatus(status)
+        except ValueError:
+            await ctx.channel.send(f'{status} is not a valid status')
+            return
+
+        await update_game_permissions(ctx, game_id, 'day', game_status)
+        db.update_table('game', {'status': game_status.value, 'end_date': date.today()}, {'game_id': game_id})
+        await ctx.channel.send(f'changed status to {game_status.value}')

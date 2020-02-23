@@ -14,7 +14,7 @@ GAME_REACTION_EMOJI  = '🐺'
 
 moderator_channel_name = 'moderator'
 
-class game_status(Enum):
+class GameStatus(Enum):
     CREATING = 'creating'
     RECRUITING = 'recruiting'
     INITIALIZING = 'initializing'

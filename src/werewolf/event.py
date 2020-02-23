@@ -5,12 +5,12 @@ This file sets the logic for how abilities interact and events that happen in th
 
 import database as db
 import globals
-from globals import game_status
+from globals import GameStatus
 from werewolf import game
 
 
 async def death(ctx, player):
-    game_data = await game.get_game(ctx.channel, game_status.ACTIVE)
+    game_data = await game.get_game(ctx.channel, GameStatus.ACTIVE)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
 

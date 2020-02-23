@@ -12,7 +12,7 @@ from texttable import Texttable
 
 import database as db
 import globals
-from globals import game_status
+from globals import GameStatus
 from werewolf import game
 
 
@@ -67,7 +67,7 @@ async def get_scenario_data(ctx, scenario_name):
     scenario_name = scenario_name.lower().replace(' ', '-')
     # todo check total characters added doesnt go over the max_duplicates in the character table
 
-    game_data = await game.get_game(ctx.channel, game_status.RECRUITING)
+    game_data = await game.get_game(ctx.channel, GameStatus.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
     elif str(ctx.channel).lower() == 'testing':  # todo figure out what channels to allow this in
@@ -90,7 +90,7 @@ async def get_scenario_data(ctx, scenario_name):
 
 async def create(ctx, scenario_name, scope):
     if scope == 'local':
-        game_data = await game.get_game(ctx.channel, game_status.RECRUITING)
+        game_data = await game.get_game(ctx.channel, GameStatus.RECRUITING)
         if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
             game_id = game_data['game_id']
         else:
@@ -114,7 +114,7 @@ async def create(ctx, scenario_name, scope):
 
 
 async def list(ctx):
-    game_data = await game.get_game(ctx.channel, game_status.RECRUITING)
+    game_data = await game.get_game(ctx.channel, GameStatus.RECRUITING)
     if game_data is not None and str(ctx.channel).lower() == globals.moderator_channel_name:
         game_id = game_data['game_id']
     elif str(ctx.channel).lower() == 'testing':  # todo figure out what channels to allow this in
